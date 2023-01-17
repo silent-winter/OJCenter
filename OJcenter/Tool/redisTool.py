@@ -15,6 +15,8 @@ _Str_Port_to_User = "PortUser"
 _Str_Port_Start_Time = "PortStartTime"
 _Str_User_File_Save_Mode = "FileSaveMode"
 
+r = redis.Redis(host='http://192.168.149.133', port=6379, decode_responses=True)
+
 
 # 把用户放进队列
 def connectRedis():
@@ -50,7 +52,6 @@ def insertUser(username):
     if not checkUserInList(username):
         return "本系统当前被用于考试/比赛，而您未被邀请参加，因此暂时无法使用本系统。如有疑问请联系考试/比赛组织者"
 
-    r = connectRedis()
     if r.exists(_Str_User_to_Port + username):
         print(username, "已在使用docker")
         return "已经在使用了，不能排队"
@@ -75,7 +76,6 @@ def insertUser(username):
 
 def getOrdeList():
     orderList = []
-    r = connectRedis()
     if r.exists('vsUserList'):
         length = r.llen('vsUserList')
         userList = r.lrange('vsUserList', 0, length)
@@ -92,7 +92,6 @@ def createToken():
 # -1：出现错误
 # targetUser, targetPort：队首用户名，对应的端口号
 def popUser():
-    r = connectRedis()
     if r.exists('vsUserList'):
         length = r.llen('vsUserList')
         if length > 0:
@@ -134,7 +133,6 @@ def popUser():
 
 # 查询用户当前是否正在使用Dokcer
 def queryUser(username):
-    r = connectRedis()
     if r.exists(_Str_User_to_Token + username):
         targetToken = r.get(_Str_User_to_Token + username)
         if r.exists(targetToken):
@@ -151,7 +149,6 @@ removeUserMutex = threading.Lock()
 
 # 删除用户，关闭并销毁用户开启的docker，并且在排队中删除他（让他完全在系统缓存中消失）
 def removeUser(username):
-    r = connectRedis()
     removeUserMutex.acquire()
     try:
         if r.exists(_Str_User_to_Port + username):
@@ -188,7 +185,6 @@ def removeUser(username):
 
 
 def checkToken():
-    r = connectRedis()
     _new_occupiedPort = []
 
     occupiedPortList = []
@@ -216,7 +212,6 @@ def checkToken():
 
 
 def extendLife(username):
-    r = connectRedis()
     if r.exists(_Str_User_to_Port + username):
         targetPort = r.get(_Str_User_to_Port + username)
         r.set(_Str_Port_Start_Time + str(targetPort), int(time.time()))
@@ -225,7 +220,6 @@ def extendLife(username):
 # 获取用户对应的端口
 # 获取失败返回None
 def getPort(username):
-    r = connectRedis()
     if r.exists(_Str_User_to_Token + username):
         targetToken = r.get(_Str_User_to_Token + username)
         if r.exists(targetToken):
@@ -239,7 +233,6 @@ def getPort(username):
 # 获取用户对应的端口的Cookie
 # 获取失败返回None
 def getPortToken(username):
-    r = connectRedis()
     if r.exists(_Str_User_to_Token + username):
         targetToken = r.get(_Str_User_to_Token + username)
         if r.exists(targetToken):
@@ -251,13 +244,11 @@ def getPortToken(username):
 
 
 def cleanRedis():
-    r = connectRedis()
     for key in r.scan_iter("*"):
         r.delete(key)
 
 
 def getUseTime(username):
-    r = connectRedis()
     if r.exists(_Str_User_to_Token + username):
         targetToken = r.get(_Str_User_to_Token + username)
         if r.exists(targetToken):
@@ -272,7 +263,6 @@ def getUseTime(username):
 
 
 def cleanUsedContainer():
-    r = connectRedis()
     for key in r.scan_iter("*"):
         if str(key).startswith(_Str_User_to_Port):
             username = key.replace(_Str_User_to_Port, "", 1)
@@ -284,7 +274,6 @@ def cleanUsedContainer():
 
 
 def collectUser():
-    r = connectRedis()
     collecDict = {}
     for key in r.scan_iter("*"):
         if str(key).startswith(_Str_User_to_Port):
@@ -295,7 +284,6 @@ def collectUser():
 
 
 def countUser():
-    r = connectRedis()
     count = 0
     for key in r.scan_iter("*"):
         if str(key).startswith(_Str_User_to_Port):
@@ -304,7 +292,6 @@ def countUser():
 
 
 def getPortList():
-    r = connectRedis()
     occupiedPortList = []
     for key in r.scan_iter("*"):
         if str(key).startswith(_Str_Port_to_User):
