@@ -5,15 +5,14 @@ import platform
 defaultFileName = ["main", "main.c", "main.py", "main.cpp"]
 
 
-def initUserFolder(targetUser):
-    rootPath = ""
+def initUserFolder(targetUser, pvPath):
     if platform.system() == 'Windows':
         rootPath = r"D:\templeenvironment\dockerdir"
     elif platform.system() == 'Linux':
         rootPath = "/dockerdir"
     else:
         rootPath = "/"
-    samplePath = os.path.join(rootPath, "answer")
+    samplePath = "/dockerdir/answer"
     userPath = os.path.join(rootPath, "userfolder")
     targetPath = os.path.join(userPath, targetUser)
     if not os.path.exists(targetPath):

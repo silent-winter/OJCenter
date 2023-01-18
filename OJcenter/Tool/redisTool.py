@@ -3,7 +3,7 @@ import threading
 import time
 import uuid
 import redis  # 导入redis 模块
-from . import dockerTool, systemTool, permanentTool
+from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
 
 ex_time = 15 * 60
 # ex_time = 1 * 30
@@ -15,7 +15,7 @@ _Str_Port_to_User = "PortUser"
 _Str_Port_Start_Time = "PortStartTime"
 _Str_User_File_Save_Mode = "FileSaveMode"
 
-r = redis.Redis(host='http://192.168.149.133', port=6379, decode_responses=True)
+r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
 
 # 把用户放进队列
@@ -97,7 +97,9 @@ def popUser():
         if length > 0:
 
             # targetPort=dockerTool.createContainer()
-            targetPort = systemTool.getOneContainer()
+            podInfo = k8sTool.select()
+            print(podInfo)
+            hostIp, targetPort, pvPath = podInfo.ip, podInfo.port, podInfo.pvPath
             if targetPort == -1:
                 return -1, -1
 
@@ -106,7 +108,7 @@ def popUser():
             # targetPort = 1000
 
             targetTokens = createToken()
-            r.set(_Str_User_to_Port + targetUser, targetPort)
+            r.set(_Str_User_to_Port + targetUser, "%s-%s" % (hostIp, targetPort))
             r.set(_Str_User_to_Token + targetUser, targetTokens)
 
             r.set(_Str_Port_to_User + str(targetPort), targetUser)
@@ -119,9 +121,10 @@ def popUser():
                 targetInnerPath = permanentTool.initEmptyFolder()
             else:
                 r.set(_Str_User_File_Save_Mode + targetUser, 1)
-                targetInnerPath = permanentTool.initUserFolder(targetUser)
+                targetInnerPath = permanentTool.initUserFolder(targetUser, pvPath)
 
-            dockerTool.copyPermanentFolder(targetUser, targetPort, targetInnerPath)
+            # dockerTool.copyPermanentFolder(targetUser, targetPort, targetInnerPath)
+            k8sTool.copy_permanent_folder(targetUser, pvPath)
 
             # r.set(_Str_User_to_Token + targetUser, targetTokens, ex=ex_time)
             return targetUser, targetPort

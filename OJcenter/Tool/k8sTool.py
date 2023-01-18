@@ -1,10 +1,13 @@
 import os
-import time
+import shutil
 from retry import retry
 
 from kubernetes import client
 from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
 from kubernetes.client.rest import ApiException
+
+from OJcenter.Tool import aesTool, timeTool
+from OJcenter.Tool.model import PodMetaInfo
 
 # 获取apiserver token
 # kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
@@ -25,10 +28,9 @@ client.Configuration.set_default(configuration)
 coreApi = client.CoreV1Api(client.ApiClient(configuration))
 appsApi = client.AppsV1Api(client.ApiClient(configuration))
 
-# 标识server和pvc，唯一性
-_index = 1
 # 记录最后一个pod的主机端口
 _port = 0
+# @PodMetaInfo(ip, port, podName, pvPath)
 _result = []
 
 
@@ -41,25 +43,27 @@ def init():
 
 # 创建n个pod
 def create(n):
-    global _index, _port
+    global _port
     for i in range(_port, _port + n):
-        pvcName = "pvc-%s" % _index
-        podName = "server-%s" % _index
+        pvcName = "pvc-%s" % i
+        podName = "server-%s" % i
         create_pvc(pvcName)
         create_pod(podName, i, pvcName)
         pvName = get_pv_name(pvcName)
-        # 初始化main文件
-        filePath = "default-" + pvcName + "-" + pvName
-        command = "cp /nfs/data/base/main* /nfs/data/" + filePath
-        os.system(command)
-        _index = _index + 1
-        print(podName, "create success!")
-    time.sleep(2)
-    _index = _index - n
-    for i in range(_port, _port + n):
-        podName = "server-%s" % _index
-        _index = _index + 1
-        _result.append((get_host_ip(podName), i))
+        # 初始化文件
+        pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
+        shutil.copytree("/nfs/data/base/.vscode", pvPath + "/.vscode")
+        shutil.copytree("/nfs/data/base/answer", pvPath + "/answer")
+        shutil.copytree("/nfs/data/base/test", pvPath + "/test")
+        _result.append(PodMetaInfo(get_host_ip(podName), i, podName, pvPath))
+    # time.sleep(2)
+    # _index = _index - n
+    # for i in range(_port, _port + n):
+    #     podName = "server-%s" % _index
+    #     _index = _index + 1
+    #     _result.append(PodMetaInfo(get_host_ip(podName), i, podName, "/nfs/data/" + pvName))
+    #     print(podName, "create success!")
+    print(_result)
     _port = _port + n
 
 
@@ -89,7 +93,7 @@ def create_pod(podName, hostPort, pvcName) -> V1Pod:
               hostPort: 10000
           volumeMounts:
             - name: answer-volume
-              mountPath: "/config/workspace/answer"
+              mountPath: "/config/workspace"
       volumes:
         - name: answer-volume
           persistentVolumeClaim:
@@ -97,7 +101,7 @@ def create_pod(podName, hostPort, pvcName) -> V1Pod:
     """
     body = eval(
         '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20220330:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
-            hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace/answer"}]}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
+            hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace"}]}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
     return pod
 
@@ -161,13 +165,18 @@ def list_pod_for_all_namespaces() -> V1PodList:
     return podList
 
 
-if __name__ == '__main__':
-    init()
-    # create(2, 10001)
-    # pods = list_pod_for_all_namespaces()
-    # for pod in pods.items:
-    #     print("%s\t%s\t%s" % (pod.status.pod_ip, pod.metadata.namespace, pod.metadata.name))
-    # pod = read_namespaced_pod(name="oj-k8s-server", namespace="default")
-    # podDict = pod.to_dict()
-    # print(podDict.get("status").get("host_ip"))
-    # print(podDict.get("spec").get("containers")[0].get("ports")[0].get("host_port"))
+def copy_permanent_folder(username, pvPath):
+    userPath = "/dockerdir/userfolder/%s/answer" % username
+    shutil.rmtree(pvPath + "/answer")
+    shutil.copytree(userPath, pvPath + "/answer")
+    currTime = timeTool.getCurrTime()
+    authFile = "/dockerdir/userfolder/%s/authorization" % username
+    if os.path.exists(authFile):
+        os.remove(authFile)
+    code = aesTool.getEncrypt(username + ' ' + currTime)
+    with open(file=authFile, mode="w") as f:
+        f.write(code.decode())
+    shutil.copyfile(authFile, pvPath + "/.vscode/authorization")
+
+
+init()
