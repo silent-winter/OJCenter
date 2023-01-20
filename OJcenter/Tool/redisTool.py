@@ -1,4 +1,5 @@
 import platform
+import shutil
 import threading
 import time
 import uuid
@@ -9,6 +10,7 @@ ex_time = 15 * 60
 # ex_time = 1 * 30
 all_time = 3 * 60 * 60
 # all_time = 5 * 60
+_strLoginUser = "loginUser:"
 _Str_User_to_Port = "UserPort"
 _Str_User_to_Token = "UserToekn"
 _Str_Port_to_User = "PortUser"
@@ -108,6 +110,7 @@ def popUser():
             # targetPort = 1000
 
             targetTokens = createToken()
+            r.hmset(_strLoginUser + targetUser, {"ip": hostIp, "port": targetPort, "pvPath": pvPath, "token": targetTokens})
             r.set(_Str_User_to_Port + targetUser, "%s-%s" % (hostIp, targetPort))
             r.set(_Str_User_to_Token + targetUser, targetTokens)
 
@@ -158,14 +161,17 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
+            pvPath = r.hget(_strLoginUser + username, "pvPath")
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
                 targetPath = permanentTool.cleanPermanentPath(username)
-                dockerTool.backupPermanentPath(targetPort, targetPath)
+                # dockerTool.backupPermanentPath(targetPort, targetPath)
+                k8sTool.backup_answer(targetPath, pvPath)
 
             # 删除docker操作
-            dockerTool.removeContainer(targetPort)
+            # dockerTool.removeContainer(targetPort)
+            shutil.rmtree(pvPath)
 
             if r.exists(targetToken):
                 r.delete(targetToken)

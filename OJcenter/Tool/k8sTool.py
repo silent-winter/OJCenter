@@ -179,4 +179,8 @@ def copy_permanent_folder(username, pvPath):
     shutil.copyfile(authFile, pvPath + "/.vscode/authorization")
 
 
+def backup_answer(userPath, pvPath):
+    shutil.copytree(pvPath + "/answer", userPath)
+
+
 init()
