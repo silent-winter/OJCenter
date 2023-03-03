@@ -6,7 +6,7 @@ from kubernetes import client
 from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
 from kubernetes.client.rest import ApiException
 
-from OJcenter.Tool import aesTool, timeTool
+from OJcenter.Tool import aesTool, timeTool, redisTool
 from OJcenter.Tool.model import PodMetaInfo
 
 # 获取apiserver token
@@ -30,21 +30,21 @@ appsApi = client.AppsV1Api(client.ApiClient(configuration))
 
 # 记录最后一个pod的主机端口
 _port = 0
-# @PodMetaInfo(ip, port, podName, pvPath)
-_result = []
 
 
-def init():
+def init(start, end):
     global _port
-    start, end = 9100, 9102
     _port = start
-    create(end - start + 1)
+    return create(end - start + 1)
 
 
 # 创建n个pod
 def create(n):
     global _port
+    result = []
     for i in range(_port, _port + n):
+        if redisTool.existPod(i):
+            continue
         pvcName = "pvc-%s" % i
         podName = "server-%s" % i
         create_pvc(pvcName)
@@ -52,10 +52,11 @@ def create(n):
         pvName = get_pv_name(pvcName)
         # 初始化文件
         pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
-        shutil.copytree("/nfs/data/base/.vscode", pvPath + "/.vscode")
-        shutil.copytree("/nfs/data/base/answer", pvPath + "/answer")
-        shutil.copytree("/nfs/data/base/test", pvPath + "/test")
-        _result.append(PodMetaInfo(get_host_ip(podName), i, podName, pvPath))
+        os.system("cp -rp /nfs/data/base/.vscode " + pvPath)
+        os.system("cp -rp /nfs/data/base/answer " + pvPath)
+        os.system("cp -rp /nfs/data/base/test " + pvPath)
+
+        result.append(PodMetaInfo(get_host_ip(podName), i, podName, pvPath))
     # time.sleep(2)
     # _index = _index - n
     # for i in range(_port, _port + n):
@@ -63,12 +64,9 @@ def create(n):
     #     _index = _index + 1
     #     _result.append(PodMetaInfo(get_host_ip(podName), i, podName, "/nfs/data/" + pvName))
     #     print(podName, "create success!")
-    print(_result)
+    print(result)
     _port = _port + n
-
-
-def select():
-    return _result.pop()
+    return result
 
 
 def create_pod(podName, hostPort, pvcName) -> V1Pod:
@@ -169,6 +167,9 @@ def copy_permanent_folder(username, pvPath):
     userPath = "/dockerdir/userfolder/%s/answer" % username
     shutil.rmtree(pvPath + "/answer")
     shutil.copytree(userPath, pvPath + "/answer")
+    # 设置文件所有者
+    os.system("chown -R 911 %s/answer" % pvPath)
+    os.system("chgrp -R 911 %s/answer" % pvPath)
     currTime = timeTool.getCurrTime()
     authFile = "/dockerdir/userfolder/%s/authorization" % username
     if os.path.exists(authFile):
@@ -181,6 +182,3 @@ def copy_permanent_folder(username, pvPath):
 
 def backup_answer(userPath, pvPath):
     shutil.copytree(pvPath + "/answer", userPath)
-
-
-init()

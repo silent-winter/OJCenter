@@ -33,6 +33,7 @@ urlpatterns = [
     # url(r'^codeview', views.vscode),
     # url(r'^logout', views.logout),
 
+    url(r'^.*getvscodesource', view.getVsCodeUrl),
     url(r'^.*insertuser', view.insertUser),
     url(r'^.*getorder', view.getOrder),
     url(r'^.*checkalive', view.checkAlive),

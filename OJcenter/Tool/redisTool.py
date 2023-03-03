@@ -5,6 +5,7 @@ import time
 import uuid
 import redis  # 导入redis 模块
 from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
+from OJcenter.Tool.model import PodMetaInfo
 
 ex_time = 15 * 60
 # ex_time = 1 * 30
@@ -16,6 +17,9 @@ _Str_User_to_Token = "UserToekn"
 _Str_Port_to_User = "PortUser"
 _Str_Port_Start_Time = "PortStartTime"
 _Str_User_File_Save_Mode = "FileSaveMode"
+# 存储pod元信息
+_strPodMetaInfo = "pod:metaInfo:"
+_strPodPortList = "pod:portList"
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
@@ -28,6 +32,21 @@ def connectRedis():
         return redis.Redis(host='localhost', port=6379, decode_responses=True)
     else:
         return redis.Redis(host='localhost', port=6379, decode_responses=True, password="kujiji555")
+
+
+def existPod(port):
+    return r.exists(_strPodMetaInfo + str(port))
+
+
+def savePod(pod):
+    r.hmset(_strPodMetaInfo + str(pod.port), {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
+    r.lpush(_strPodPortList, pod.port)
+
+
+def getPod():
+    p = r.rpop(_strPodPortList)
+    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + str(p), ["ip", "port", "name", "pvPath"])
+    return PodMetaInfo(ip, port, name, pvPath)
 
 
 def checkUserInList(username):
@@ -99,7 +118,7 @@ def popUser():
         if length > 0:
 
             # targetPort=dockerTool.createContainer()
-            podInfo = k8sTool.select()
+            podInfo = getPod()
             print(podInfo)
             hostIp, targetPort, pvPath = podInfo.ip, podInfo.port, podInfo.pvPath
             if targetPort == -1:
@@ -110,7 +129,7 @@ def popUser():
             # targetPort = 1000
 
             targetTokens = createToken()
-            r.hmset(_strLoginUser + targetUser, {"ip": hostIp, "port": targetPort, "pvPath": pvPath, "token": targetTokens})
+            # r.hmset(_strLoginUser + targetUser, {"ip": hostIp, "port": targetPort, "pvPath": pvPath, "token": targetTokens})
             r.set(_Str_User_to_Port + targetUser, "%s-%s" % (hostIp, targetPort))
             r.set(_Str_User_to_Token + targetUser, targetTokens)
 
@@ -135,6 +154,10 @@ def popUser():
             return -1, -1
     else:
         return -1, -1
+
+def getSourceUrl(username):
+    port = r.get(_Str_User_to_Port + username)
+    return r.hmget(_strPodMetaInfo + str(port), "ip", "port")
 
 
 # 查询用户当前是否正在使用Dokcer
@@ -161,7 +184,7 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
-            pvPath = r.hget(_strLoginUser + username, "pvPath")
+            pvPath = r.hget(_strPodMetaInfo + str(targetPort), "pvPath")
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
@@ -175,6 +198,7 @@ def removeUser(username):
 
             if r.exists(targetToken):
                 r.delete(targetToken)
+            r.lpush(_strPodPortList, targetPort)
 
             r.delete(_Str_User_to_Port + username)
             r.delete(_Str_User_to_Token + username)

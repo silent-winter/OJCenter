@@ -12,15 +12,22 @@ import requests
 from OJcenter.Tool import redisTool, permanentTool, dockerTool, k8sTool
 
 create_wait_times = 20
+_orderDict = {}
+_createdPort = []
+_occupiedPort = [None]
+_result = []
 
 
 def _init():
-    global _orderDict
-    _orderDict = {}
-    global _occupiedPort
-    _occupiedPort = [None]
-    global _createdPort
-    _createdPort = []
+    pass
+    # global _orderDict
+    # _orderDict = {}
+    # global _occupiedPort
+    # _occupiedPort = [None]
+    # global _createdPort
+    # _createdPort = []
+    # global _result
+    # _result = []
 
 
 cleanOccupiedMutex = threading.Lock()
@@ -47,14 +54,15 @@ def judgeSpace():
     global _orderDict
     global _occupiedPort
     global _createdPort
-    if len(_occupiedPort) > 0 and _occupiedPort[0] == None:
-        return False
-    cf = getConfiguration()
-    maxuser = int(cf.get("portconfig", "maxuser"))
-    if len(_orderDict) > 0 and len(_createdPort) > 0 and len(_occupiedPort) < maxuser:
-        return True
-    else:
-        return False
+    return True
+    # if len(_occupiedPort) > 0 and _occupiedPort[0] == None:
+    #     return False
+    # cf = getConfiguration()
+    # maxuser = int(cf.get("portconfig", "maxuser"))
+    # if len(_orderDict) > 0 and len(_createdPort) > 0 and len(_occupiedPort) < maxuser:
+    #     return True
+    # else:
+    #     return False
 
 
 def refreshDict():
@@ -180,6 +188,15 @@ def initCreatedDockerPort():
         if item in _createdPort:
             _createdPort.remove(item)
     createNewDockerMutex.release()
+
+
+def initK8sPod():
+    cf = getConfiguration()
+    startport = int(cf.get("portconfig", "startport"))
+    endport = int(cf.get("portconfig", "endport"))
+    result = k8sTool.init(startport, endport)
+    for pod in result:
+        redisTool.savePod(pod)
 
 
 def refreshCreatedPort():

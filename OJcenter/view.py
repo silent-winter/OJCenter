@@ -11,11 +11,22 @@ import urllib
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from pytz import timezone
-from OJcenter.Tool import systemTool, redisTool, dockerTool, userTool, messageTool, RSAdecode, aesTool
+from OJcenter.Tool import systemTool, dockerTool, userTool, messageTool, RSAdecode, aesTool, k8sTool, redisTool
 from .model import UserstatusDetail
 
 cst_tz = timezone('Asia/Shanghai')
 utc_tz = timezone('UTC')
+
+
+def getVsCodeUrl(request):
+    username = systemTool.checkLogin(request)
+    if username == None:
+        faileddict = {"result": -100, "sourceUrl": ""}
+        return HttpResponse(json.dumps(faileddict), content_type="application/json")
+    ip, port = redisTool.getSourceUrl(username)
+    url = "http://%s:%s" % (ip, port)
+    result = {"result": 1, "sourceUrl": url}
+    return HttpResponse(json.dumps(result), content_type="application/json")
 
 
 def getUsername(request):
@@ -159,7 +170,11 @@ def init():
     # redisTool.cleanRedis()
 
     # 清点所有容器，并且随时创建新容器
-    systemTool.refreshCreatedPort()
+    # systemTool.refreshCreatedPort()
+    try:
+        systemTool.initK8sPod()
+    except:
+        pass
     # 把队首的人拿出来
     systemTool.refreshOrder()
     # dockerTool.refreshthread()
