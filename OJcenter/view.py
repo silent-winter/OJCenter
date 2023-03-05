@@ -26,6 +26,7 @@ def getVsCodeUrl(request):
     ip, port = redisTool.getSourceUrl(username)
     url = "http://%s:%s" % (ip, port)
     result = {"result": 1, "sourceUrl": url}
+    print(result)
     return HttpResponse(json.dumps(result), content_type="application/json")
 
 
@@ -304,21 +305,22 @@ def getSubmitAnswer(request):
             languageint = 3
 
         targetPort = redisTool.getPort(username)
-        souce = dockerTool.getContainerFile(targetPort, language)
+        # souce = dockerTool.getContainerFile(targetPort, language)
+        source = k8sTool.getTargetFile(targetPort, language)
 
         url = 'http://127.0.0.1:2336/vsbuctojsubmit.php'
         if cid == 0:
             d = {"user_id": username,
                  "password": "",
                  "language": languageint,
-                 "source": souce,
+                 "source": source,
                  "VSmode": 1,
                  "id": id}
         else:
             d = {"user_id": username,
                  "password": "",
                  "language": languageint,
-                 "source": souce,
+                 "source": source,
                  "VSmode": "1",
                  "cid": cid,
                  "pid": pid}

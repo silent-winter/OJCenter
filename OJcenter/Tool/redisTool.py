@@ -13,7 +13,7 @@ all_time = 3 * 60 * 60
 # all_time = 5 * 60
 _strLoginUser = "loginUser:"
 _Str_User_to_Port = "UserPort"
-_Str_User_to_Token = "UserToekn"
+_Str_User_to_Token = "UserToken"
 _Str_Port_to_User = "PortUser"
 _Str_Port_Start_Time = "PortStartTime"
 _Str_User_File_Save_Mode = "FileSaveMode"
@@ -35,17 +35,21 @@ def connectRedis():
 
 
 def existPod(port):
-    return r.exists(_strPodMetaInfo + str(port))
+    return r.exists(_strPodMetaInfo + port)
 
 
 def savePod(pod):
-    r.hmset(_strPodMetaInfo + str(pod.port), {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
+    r.hmset(_strPodMetaInfo + pod.port, {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
     r.lpush(_strPodPortList, pod.port)
 
 
 def getPod():
     p = r.rpop(_strPodPortList)
-    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + str(p), ["ip", "port", "name", "pvPath"])
+    return getPodByPort(p)
+
+
+def getPodByPort(port):
+    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + port, ["ip", "port", "name", "pvPath"])
     return PodMetaInfo(ip, port, name, pvPath)
 
 
@@ -130,11 +134,11 @@ def popUser():
 
             targetTokens = createToken()
             # r.hmset(_strLoginUser + targetUser, {"ip": hostIp, "port": targetPort, "pvPath": pvPath, "token": targetTokens})
-            r.set(_Str_User_to_Port + targetUser, "%s-%s" % (hostIp, targetPort))
+            r.set(_Str_User_to_Port + targetUser, targetPort)
             r.set(_Str_User_to_Token + targetUser, targetTokens)
 
-            r.set(_Str_Port_to_User + str(targetPort), targetUser)
-            r.set(_Str_Port_Start_Time + str(targetPort), int(time.time()))
+            r.set(_Str_Port_to_User + targetPort, targetUser)
+            r.set(_Str_Port_Start_Time + targetPort, int(time.time()))
 
             r.set(targetTokens, targetPort, ex=ex_time)
 
@@ -146,7 +150,7 @@ def popUser():
                 targetInnerPath = permanentTool.initUserFolder(targetUser, pvPath)
 
             # dockerTool.copyPermanentFolder(targetUser, targetPort, targetInnerPath)
-            k8sTool.copy_permanent_folder(targetUser, pvPath)
+            k8sTool.copyPermanentFolder(targetUser, pvPath)
 
             # r.set(_Str_User_to_Token + targetUser, targetTokens, ex=ex_time)
             return targetUser, targetPort
@@ -157,7 +161,7 @@ def popUser():
 
 def getSourceUrl(username):
     port = r.get(_Str_User_to_Port + username)
-    return r.hmget(_strPodMetaInfo + str(port), "ip", "port")
+    return r.hmget(_strPodMetaInfo + port, ["ip", "port"])
 
 
 # 查询用户当前是否正在使用Dokcer
@@ -184,17 +188,18 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
-            pvPath = r.hget(_strPodMetaInfo + str(targetPort), "pvPath")
+            pvPath = r.hget(_strPodMetaInfo + targetPort, "pvPath")
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
                 targetPath = permanentTool.cleanPermanentPath(username)
                 # dockerTool.backupPermanentPath(targetPort, targetPath)
-                k8sTool.backup_answer(targetPath, pvPath)
+                k8sTool.backupAnswer(targetPath, pvPath)
 
             # 删除docker操作
             # dockerTool.removeContainer(targetPort)
-            shutil.rmtree(pvPath)
+            shutil.rmtree(pvPath + "/answer")
+            shutil.rmtree(pvPath + "/test")
 
             if r.exists(targetToken):
                 r.delete(targetToken)

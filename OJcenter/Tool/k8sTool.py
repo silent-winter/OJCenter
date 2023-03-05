@@ -47,16 +47,16 @@ def create(n):
             continue
         pvcName = "pvc-%s" % i
         podName = "server-%s" % i
-        create_pvc(pvcName)
-        create_pod(podName, i, pvcName)
-        pvName = get_pv_name(pvcName)
+        createPvc(pvcName)
+        createPod(podName, i, pvcName)
+        pvName = getPvName(pvcName)
         # 初始化文件
         pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
         os.system("cp -rp /nfs/data/base/.vscode " + pvPath)
         os.system("cp -rp /nfs/data/base/answer " + pvPath)
         os.system("cp -rp /nfs/data/base/test " + pvPath)
 
-        result.append(PodMetaInfo(get_host_ip(podName), i, podName, pvPath))
+        result.append(PodMetaInfo(getHostIp(podName), i, podName, pvPath))
     # time.sleep(2)
     # _index = _index - n
     # for i in range(_port, _port + n):
@@ -69,7 +69,7 @@ def create(n):
     return result
 
 
-def create_pod(podName, hostPort, pvcName) -> V1Pod:
+def createPod(podName, hostPort, pvcName) -> V1Pod:
     # http://www.json2yaml.com/ yaml转json
     # https://www.json.cn/json/jsonzip.html 压缩json
     """
@@ -104,14 +104,14 @@ def create_pod(podName, hostPort, pvcName) -> V1Pod:
     return pod
 
 
-def delete_pod(name, namespace) -> V1Pod:
+def deletePod(name, namespace) -> V1Pod:
     try:
         return coreApi.delete_namespaced_pod(name, namespace)
     except ApiException as e:
         print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
 
 
-def create_pvc(pvcName) -> V1PersistentVolumeClaim:
+def createPvc(pvcName) -> V1PersistentVolumeClaim:
     """
     apiVersion: v1
     kind: PersistentVolumeClaim
@@ -132,7 +132,7 @@ def create_pvc(pvcName) -> V1PersistentVolumeClaim:
 
 
 @retry(tries=5, delay=1)
-def get_pv_name(pvcName):
+def getPvName(pvcName):
     try:
         pvc = coreApi.read_namespaced_persistent_volume_claim(name=pvcName, namespace="default")
         pvName = pvc.to_dict().get("spec").get("volume_name")
@@ -144,7 +144,7 @@ def get_pv_name(pvcName):
 
 
 @retry(tries=5, delay=1)
-def get_host_ip(podName):
+def getHostIp(podName):
     try:
         pod = coreApi.read_namespaced_pod(name=podName, namespace="default")
         hostIp = pod.to_dict().get("status").get("host_ip")
@@ -155,7 +155,7 @@ def get_host_ip(podName):
         return ""
 
 
-def list_pod_for_all_namespaces() -> V1PodList:
+def listPodForAllNamespaces() -> V1PodList:
     podList = coreApi.list_pod_for_all_namespaces(watch=False)
     print("Listing pods with their IPs:")
     for item in podList.items:
@@ -163,7 +163,7 @@ def list_pod_for_all_namespaces() -> V1PodList:
     return podList
 
 
-def copy_permanent_folder(username, pvPath):
+def copyPermanentFolder(username, pvPath):
     userPath = "/dockerdir/userfolder/%s/answer" % username
     shutil.rmtree(pvPath + "/answer")
     shutil.copytree(userPath, pvPath + "/answer")
@@ -180,5 +180,13 @@ def copy_permanent_folder(username, pvPath):
     shutil.copyfile(authFile, pvPath + "/.vscode/authorization")
 
 
-def backup_answer(userPath, pvPath):
+def backupAnswer(userPath, pvPath):
     shutil.copytree(pvPath + "/answer", userPath)
+
+
+def getTargetFile(port, language):
+    pod = redisTool.getPodByPort(port)
+    filePath = pod.pvPath + "/answer/main." + language
+    with open(filePath, mode="r", encoding="utf-8") as f:
+        text = f.read()
+    return text
