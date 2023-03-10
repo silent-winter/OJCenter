@@ -16,6 +16,11 @@ _orderDict = {}
 _createdPort = []
 _occupiedPort = [None]
 _result = []
+# 初始化配置文件
+_cf = configparser.ConfigParser()
+_cf.read(sys.path[0] + "/OJcenter/Tool/config.ini")
+_startPort = int(_cf.get("portconfig", "startport"))
+_endPort = int(_cf.get("portconfig", "endport"))
 
 
 def _init():
@@ -43,11 +48,11 @@ def getOrder(item):
         return -1
 
 
-def getConfiguration():
-    path = sys.path[0] + "/OJcenter/Tool/config.ini"
-    cf = configparser.ConfigParser()
-    cf.read(path)
-    return cf
+# def getConfiguration():
+#     path = sys.path[0] + "/OJcenter/Tool/config.ini"
+#     cf = configparser.ConfigParser()
+#     cf.read(path)
+#     return cf
 
 
 def judgeSpace():
@@ -172,15 +177,12 @@ def initCreatedDockerPort():
     global _createdPort
 
     createNewDockerMutex.acquire()
-    cf = getConfiguration()
-    startport = int(cf.get("portconfig", "startport"))
-    endport = int(cf.get("portconfig", "endport"))
     for index in range(sys.maxsize):
-        if index >= startport and index <= endport:
+        if _startPort <= index <= _endPort:
             if dockerTool.dockerExist(index):
                 _createdPort.append(index)
                 print(index, "初始化存在")
-        if index > endport:
+        if index > _endPort:
             break
 
     portList = redisTool.getPortList()
@@ -190,13 +192,15 @@ def initCreatedDockerPort():
     createNewDockerMutex.release()
 
 
+# 根据配置文件初始化pod
 def initK8sPod():
-    cf = getConfiguration()
-    startport = int(cf.get("portconfig", "startport"))
-    endport = int(cf.get("portconfig", "endport"))
-    result = k8sTool.init(startport, endport)
+    result = k8sTool.init(_startPort, _endPort)
     for pod in result:
         redisTool.savePod(pod)
+
+
+def isPermanentPort(port):
+    return _startPort <= port <= _endPort
 
 
 def refreshCreatedPort():
@@ -225,12 +229,9 @@ def refreshCreatedDockerPort():
     global _createdPort
     while True:
         try:
-            cf = getConfiguration()
-            startport = int(cf.get("portconfig", "startport"))
-            endport = int(cf.get("portconfig", "endport"))
-            if endport > startport:
+            if _endPort > _startPort:
                 for index in range(sys.maxsize):
-                    if index >= startport and index <= endport:
+                    if _startPort <= index <= _endPort:
                         if not dockerTool.dockerExist(index):
                             if not IsOpen(index):
                                 targetPort = dockerTool.createContainerWait(index)
@@ -241,15 +242,11 @@ def refreshCreatedDockerPort():
                                     _createdPort.append(targetPort)
 
                                     createNewDockerMutex.release()
-                    if index > endport:
+                    if index > _endPort:
                         break
         except Exception as e:
             print(e)
         time.sleep(1)
-
-
-if __name__ == '__main__':
-    IsOpen(80)
 
 
 def getPHPUserName(PHPSESSID):

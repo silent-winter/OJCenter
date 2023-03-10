@@ -1,8 +1,10 @@
+import os
 import platform
-import shutil
 import threading
+import _thread
 import time
 import uuid
+
 import redis  # 导入redis 模块
 from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
 from OJcenter.Tool.model import PodMetaInfo
@@ -35,21 +37,27 @@ def connectRedis():
 
 
 def existPod(port):
-    return r.exists(_strPodMetaInfo + port)
+    return r.exists(_strPodMetaInfo + str(port))
 
 
 def savePod(pod):
-    r.hmset(_strPodMetaInfo + pod.port, {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
+    if pod is None:
+        return
+    r.hmset(_strPodMetaInfo + str(pod.port), {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
     r.lpush(_strPodPortList, pod.port)
 
 
 def getPod():
+    if r.llen(_strPodPortList) == 0:
+        # 没有空闲的pod, 创建
+        result = k8sTool.batchCreate(1)
+        savePod(result[0])
     p = r.rpop(_strPodPortList)
     return getPodByPort(p)
 
 
 def getPodByPort(port):
-    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + port, ["ip", "port", "name", "pvPath"])
+    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + str(port), ["ip", "port", "name", "pvPath"])
     return PodMetaInfo(ip, port, name, pvPath)
 
 
@@ -159,9 +167,10 @@ def popUser():
     else:
         return -1, -1
 
+
 def getSourceUrl(username):
     port = r.get(_Str_User_to_Port + username)
-    return r.hmget(_strPodMetaInfo + port, ["ip", "port"])
+    return r.hmget(_strPodMetaInfo + str(port), ["ip", "port"])
 
 
 # 查询用户当前是否正在使用Dokcer
@@ -188,7 +197,7 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
-            pvPath = r.hget(_strPodMetaInfo + targetPort, "pvPath")
+            pvPath, name = r.hmget(_strPodMetaInfo + targetPort, ["pvPath", "name"])
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
@@ -198,12 +207,23 @@ def removeUser(username):
 
             # 删除docker操作
             # dockerTool.removeContainer(targetPort)
-            shutil.rmtree(pvPath + "/answer")
-            shutil.rmtree(pvPath + "/test")
-
+            # 删除pod, pvc, pv
+            pvcName = "pvc-" + targetPort
+            k8sTool.deletePod(name)
+            r.delete(_strPodMetaInfo + targetPort)
+            if not systemTool.isPermanentPort(int(targetPort)):
+                # 非常驻节点, 全部删除
+                k8sTool.deletePvc(pvcName)
+                os.system("rm -rf " + pvPath)
+            else:
+                # 常驻节点, 重新创建
+                _thread.start_new_thread(lambda: (
+                    time.sleep(15),
+                    k8sTool.createPod(name, targetPort, pvcName),
+                    savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
+                ), ())
             if r.exists(targetToken):
                 r.delete(targetToken)
-            r.lpush(_strPodPortList, targetPort)
 
             r.delete(_Str_User_to_Port + username)
             r.delete(_Str_User_to_Token + username)

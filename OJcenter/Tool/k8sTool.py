@@ -1,5 +1,7 @@
 import os
 import shutil
+from typing import Optional
+
 from retry import retry
 
 from kubernetes import client
@@ -13,8 +15,8 @@ from OJcenter.Tool.model import PodMetaInfo
 # kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
 # api文档
 # https://github.com/kubernetes-client/python/blob/master/kubernetes/docs
-token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6InJZVzRWdWZjOXNpdENJcl82Sm5BblhuRVVjUjlRMlJYQ3E3M3pKNlVsVEkifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlcm5ldGVzLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLXd6YzRkIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiJiNGEzODcxOC1lZTJlLTRjZTYtODcxMi04ZTE3OWEzYmE2NjIiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZXJuZXRlcy1kYXNoYm9hcmQ6YWRtaW4tdXNlciJ9.IKQD-Ei1DcSCXz3SA-EwvQBQRObuSmTqnsQqadmfK0Y79wvQHM1Yuq8c6aWjvrmT18o5UdZ7yrfyWBeN2SzPDaR2FazbK4MDiRoUG7rhtwOYo19RZ3e_RlYzxjjq3h7Cd2PSfryU1zYQQi1INiZvXpIE45W0_WSmUGzSZTl4dStiSBiVvpRZduq2_7A-LKoXG_UwVkiCV0TR7NXp3W8sMQ8jCdEBa0skZ_1DRHd4yg9NoPE6NjaZPa2U0Ol8hc2tzt_yQFjX1iC4n_RtaPZBXp2i5R8LmpbhY2Dw-2VVc01r9i2iBTR5xaMWh75Pt_YsGPqyyBKu_adPklKMuE2Rog'
-apiServer = 'https://192.168.149.133:6443'
+token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6InplR3dYNXRsbW80bmRJaU82bS1OSE8weXdJRDlHMDN0d2RzUDJ5WGg1SDgifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlcm5ldGVzLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLWs3OTZzIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIzOTdjNzY5NS0xZDdhLTRmZmQtOTZlMi00NTkxNTNkOWI4OTIiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZXJuZXRlcy1kYXNoYm9hcmQ6YWRtaW4tdXNlciJ9.cNx9hshVWHoZHjK5ZF0HCCf7xh4sb4YIW4thbIC6Z8HfFi-W4DkTQoh5AnFbv9_DY8zllydsg8AcOobZvNLiGh2F-LFizETdmZ8NUh6o2QQhrXxsidcorl9zSZb-8CbqBgzTGqj1_KNXRptdORxk_PAVuQVDyKPdePnYkkMGgYxlNlXcOsZZEUXjDC5zHdpTZupR7ZXYCN92RKqwDIjE1hMzBwEsdK0xFFZ0P9t_UOec95Bp_n3wSO2XLhuJdrxCQX69o2NikCZz-XjiZJbSAMjJMC-EeIVSaxjHs2orkBhzSdh8nf1dmCRl2JP3wYIZiy4VdgeDXZyOnHITbMH1BA'
+apiServer = 'https://202.4.155.97:6443'
 
 configuration = client.Configuration()
 setattr(configuration, 'verify_ssl', False)
@@ -30,43 +32,51 @@ appsApi = client.AppsV1Api(client.ApiClient(configuration))
 
 # 记录最后一个pod的主机端口
 _port = 0
+_maxPort = 50000
+_end = -1
 
 
 def init(start, end):
-    global _port
-    _port = start
-    return create(end - start + 1)
+    global _port, _end
+    _port = end + 1
+    _end = end
+    result = []
+    for i in range(start, end + 1):
+        pod = create(i)
+        if pod is not None:
+            result.append(pod)
+    return result
 
 
 # 创建n个pod
-def create(n):
+def batchCreate(n):
     global _port
     result = []
-    for i in range(_port, _port + n):
-        if redisTool.existPod(i):
-            continue
-        pvcName = "pvc-%s" % i
-        podName = "server-%s" % i
-        createPvc(pvcName)
-        createPod(podName, i, pvcName)
-        pvName = getPvName(pvcName)
-        # 初始化文件
-        pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
-        os.system("cp -rp /nfs/data/base/.vscode " + pvPath)
-        os.system("cp -rp /nfs/data/base/answer " + pvPath)
-        os.system("cp -rp /nfs/data/base/test " + pvPath)
-
-        result.append(PodMetaInfo(getHostIp(podName), i, podName, pvPath))
-    # time.sleep(2)
-    # _index = _index - n
-    # for i in range(_port, _port + n):
-    #     podName = "server-%s" % _index
-    #     _index = _index + 1
-    #     _result.append(PodMetaInfo(get_host_ip(podName), i, podName, "/nfs/data/" + pvName))
-    #     print(podName, "create success!")
-    print(result)
-    _port = _port + n
+    while n > 0:
+        pod = create(_port)
+        if pod is not None:
+            result.append(pod)
+            n = n - 1
+        _port = _port + 1
+        if _port == _maxPort:
+            _port = _end + 1
     return result
+
+
+def create(port) -> Optional[PodMetaInfo]:
+    if redisTool.existPod(port):
+        return None
+    pvcName = "pvc-%s" % port
+    podName = "server-%s" % port
+    createPvc(pvcName)
+    createPod(podName, port, pvcName)
+    pvName = getPvName(pvcName)
+    # 初始化文件
+    pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
+    os.system("cp -rp /nfs/data/base/.vscode " + pvPath)
+    os.system("cp -rp /nfs/data/base/answer " + pvPath)
+    os.system("cp -rp /nfs/data/base/test " + pvPath)
+    return PodMetaInfo(getHostIp(podName), port, podName, pvPath)
 
 
 def createPod(podName, hostPort, pvcName) -> V1Pod:
@@ -81,7 +91,6 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
       labels:
         app: oj-k8s-server
     spec:
-      nodeName: k8s-worker1（可选）
       containers:
         - name: server-1
           image: server_20220330:latest
@@ -92,6 +101,13 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
           volumeMounts:
             - name: answer-volume
               mountPath: "/config/workspace"
+          resources:
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+            requests:
+              cpu: "0.5"
+              memory: "512Mi"
       volumes:
         - name: answer-volume
           persistentVolumeClaim:
@@ -104,9 +120,9 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
     return pod
 
 
-def deletePod(name, namespace) -> V1Pod:
+def deletePod(name) -> V1Pod:
     try:
-        return coreApi.delete_namespaced_pod(name, namespace)
+        return coreApi.delete_namespaced_pod(name, "default")
     except ApiException as e:
         print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
 
@@ -129,6 +145,13 @@ def createPvc(pvcName) -> V1PersistentVolumeClaim:
         '{"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"name":"' + pvcName + '"},"spec":{"resources":{"requests":{"storage":"10M"}},"accessModes":["ReadWriteMany"],"storageClassName":"managed-nfs-storage"}}')
     pvc = coreApi.create_namespaced_persistent_volume_claim(namespace="default", body=body)
     return pvc
+
+
+def deletePvc(pvcName):
+    try:
+        return coreApi.delete_namespaced_persistent_volume_claim(pvcName, "default")
+    except ApiException as e:
+        print("Exception when calling CoreV1Api->delete_namespaced_persistent_volume_claim: %s\n" % e)
 
 
 @retry(tries=5, delay=1)
