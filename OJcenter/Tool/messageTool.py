@@ -7,9 +7,9 @@ import pandas as pd
 
 def queryMessage(username):
     if platform.system() == 'Windows':
-        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "jol", charset='utf8')
+        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "jol", charset='utf8')
     elif platform.system() == 'Linux':
-        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "jol", charset='utf8')
+        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "jol", charset='utf8')
     cursor1 = db1.cursor()
     curr_time = datetime.datetime.now()
     time_str = datetime.datetime.strftime(curr_time, '%Y-%m-%d %H:%M:%S')

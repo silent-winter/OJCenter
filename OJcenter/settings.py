@@ -85,6 +85,14 @@ DATABASES = {
         'HOST': 'localhost',
         'PORT': '3306',
     }
+    # 'default': {
+    #     'ENGINE': 'django.db.backends.mysql',
+    #     'NAME': 'record',
+    #     'USER': 'root',
+    #     'PASSWORD': 'XinZi123',
+    #     'HOST': 'rm-bp1u0xeo485g955w7so.mysql.rds.aliyuncs.com',
+    #     'PORT': '3306',
+    # }
 }
 
 # Password validation

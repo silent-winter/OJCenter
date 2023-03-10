@@ -23,7 +23,7 @@ def ban(username, status, detail):
     try:
         curr_time = datetime.datetime.now()
         time_str = datetime.datetime.strftime(curr_time, '%Y-%m-%d %H:%M:%S')
-        db = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "record", charset='utf8')
+        db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
         cursor = db.cursor()
         query = """insert into userstatus_detail (username, contest_id, problem_id,
         status, pastetime, paste_label, detail, is_lock, is_unlock, updatetime) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
@@ -43,7 +43,7 @@ def updateUserStatus(username, status, detail):
     try:
         curr_time = datetime.datetime.now()
         time_str = datetime.datetime.strftime(curr_time, '%Y-%m-%d %H:%M:%S')
-        db = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "record", charset='utf8')
+        db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
         cursor = db.cursor()
         query = """insert into userstatus (username, status, detail,updatetime) values (%s,%s,%s,%s)"""
         values = (
@@ -97,7 +97,7 @@ def updateUserCode(username, fileName, content, language, key, keycode, contesti
 
         userDict = redisTool.collectUser()
         targetPort = userDict[username]
-        db = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "record", charset='utf8')
+        db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
         cursor = db.cursor()
         query = """insert into collectinfo (username, targetport, fileaddress,modifytime, codetype, modifycode, 
         updatetime, contestid, problemid, action,keynumber,keycode) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) """
@@ -118,7 +118,7 @@ def updateUserCodeExtension(username, fileName, content, language):
 
         userDict = redisTool.collectUser()
         targetPort = userDict[username]
-        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "jol", charset='utf8')
+        db1 = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "jol", charset='utf8')
         # 查找时间对应的题目和竞赛
         cursor2 = db1.cursor()
         cursor2.execute(
@@ -139,7 +139,7 @@ def updateUserCodeExtension(username, fileName, content, language):
                 problemid = problem
                 contestid = ""
 
-        db = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "record", charset='utf8')
+        db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
         cursor = db.cursor()
         query = """insert into collectinfo (username, targetport, fileaddress,modifytime, codetype, modifycode, 
         updatetime, contestid, problemid, action,keynumber,keycode) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) """

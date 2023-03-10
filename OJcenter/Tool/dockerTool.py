@@ -156,8 +156,8 @@ def dockerWriteVSFile(fileName, username, targetPort, fileContent):
 def refreshcopy():
     while True:
         try:
-            db = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "record", charset='utf8')
-            db1 = MySQLdb.connect("localhost", "debian-sys-maint", "QzeIgK4yngIYJCm6", "jol", charset='utf8')
+            db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
+            db1 = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "jol", charset='utf8')
             userDict = redisTool.collectUser()
             for username in userDict:
                 targetPort = userDict[username]

@@ -4,6 +4,7 @@ import threading
 import _thread
 import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import redis  # 导入redis 模块
 from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
@@ -24,6 +25,7 @@ _strPodMetaInfo = "pod:metaInfo:"
 _strPodPortList = "pod:portList"
 
 r = redis.Redis(host='localhost', port=6379, decode_responses=True)
+pool = ThreadPoolExecutor(max_workers=10)
 
 
 # 把用户放进队列
@@ -155,7 +157,7 @@ def popUser():
                 targetInnerPath = permanentTool.initEmptyFolder()
             else:
                 r.set(_Str_User_File_Save_Mode + targetUser, 1)
-                targetInnerPath = permanentTool.initUserFolder(targetUser, pvPath)
+                targetInnerPath = permanentTool.initUserFolder(targetUser)
 
             # dockerTool.copyPermanentFolder(targetUser, targetPort, targetInnerPath)
             k8sTool.copyPermanentFolder(targetUser, pvPath)
@@ -217,21 +219,22 @@ def removeUser(username):
                 os.system("rm -rf " + pvPath)
             else:
                 # 常驻节点, 重新创建
-                _thread.start_new_thread(lambda: (
-                    time.sleep(15),
-                    k8sTool.createPod(name, targetPort, pvcName),
-                    savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
-                ), ())
+                # _thread.start_new_thread(lambda: (
+                #     time.sleep(20),
+                #     k8sTool.createPod(name, targetPort, pvcName),
+                #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
+                # ), ())
+                # 线程池提交任务
+                pool.submit(autoCreatePermanentPod, name, pvcName, targetPort, pvPath)
+
             if r.exists(targetToken):
                 r.delete(targetToken)
-
             r.delete(_Str_User_to_Port + username)
             r.delete(_Str_User_to_Token + username)
-
             r.delete(_Str_Port_to_User + targetPort)
             r.delete(_Str_Port_Start_Time + targetPort)
-
             r.delete(_Str_User_File_Save_Mode + username)
+
         if r.exists('vsUserList'):
             length = r.llen('vsUserList')
             if length > 0:
@@ -240,6 +243,14 @@ def removeUser(username):
         print(re)
     removeUserMutex.release()
     return 1
+
+
+# 异步线程池创建pod
+def autoCreatePermanentPod(name, pvcName, port, pvPath):
+    while k8sTool.isPodExist(name):
+        time.sleep(10)
+    k8sTool.createPod(name, port, pvcName)
+    savePod(PodMetaInfo(k8sTool.getHostIp(name), port, name, pvPath))
 
 
 def checkToken():

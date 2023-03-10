@@ -186,6 +186,11 @@ def listPodForAllNamespaces() -> V1PodList:
     return podList
 
 
+def isPodExist(podName):
+    podList = coreApi.list_namespaced_pod(field_selector=f'metadata.name={podName}', namespace="default")
+    return len(podList.items) == 1
+
+
 def copyPermanentFolder(username, pvPath):
     userPath = "/dockerdir/userfolder/%s/answer" % username
     shutil.rmtree(pvPath + "/answer")
