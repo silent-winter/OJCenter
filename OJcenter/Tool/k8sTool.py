@@ -1,6 +1,7 @@
 import os
 import shutil
 from typing import Optional
+import urllib3
 
 from retry import retry
 
@@ -17,6 +18,7 @@ from OJcenter.Tool.model import PodMetaInfo
 # https://github.com/kubernetes-client/python/blob/master/kubernetes/docs
 token = 'eyJhbGciOiJSUzI1NiIsImtpZCI6InplR3dYNXRsbW80bmRJaU82bS1OSE8weXdJRDlHMDN0d2RzUDJ5WGg1SDgifQ.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJrdWJlcm5ldGVzLWRhc2hib2FyZCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VjcmV0Lm5hbWUiOiJhZG1pbi11c2VyLXRva2VuLWs3OTZzIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluLXVzZXIiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC51aWQiOiIzOTdjNzY5NS0xZDdhLTRmZmQtOTZlMi00NTkxNTNkOWI4OTIiLCJzdWIiOiJzeXN0ZW06c2VydmljZWFjY291bnQ6a3ViZXJuZXRlcy1kYXNoYm9hcmQ6YWRtaW4tdXNlciJ9.cNx9hshVWHoZHjK5ZF0HCCf7xh4sb4YIW4thbIC6Z8HfFi-W4DkTQoh5AnFbv9_DY8zllydsg8AcOobZvNLiGh2F-LFizETdmZ8NUh6o2QQhrXxsidcorl9zSZb-8CbqBgzTGqj1_KNXRptdORxk_PAVuQVDyKPdePnYkkMGgYxlNlXcOsZZEUXjDC5zHdpTZupR7ZXYCN92RKqwDIjE1hMzBwEsdK0xFFZ0P9t_UOec95Bp_n3wSO2XLhuJdrxCQX69o2NikCZz-XjiZJbSAMjJMC-EeIVSaxjHs2orkBhzSdh8nf1dmCRl2JP3wYIZiy4VdgeDXZyOnHITbMH1BA'
 apiServer = 'https://202.4.155.97:6443'
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 configuration = client.Configuration()
 setattr(configuration, 'verify_ssl', False)
@@ -158,7 +160,7 @@ def deletePvc(pvcName):
 def getPvName(pvcName):
     try:
         pvc = coreApi.read_namespaced_persistent_volume_claim(name=pvcName, namespace="default")
-        pvName = pvc.to_dict().get("spec").get("volume_name")
+        pvName = pvc.to_dict()["spec"]["volume_name"]
         assert pvName is not None
         return pvName
     except ApiException as e:
@@ -170,7 +172,7 @@ def getPvName(pvcName):
 def getHostIp(podName):
     try:
         pod = coreApi.read_namespaced_pod(name=podName, namespace="default")
-        hostIp = pod.to_dict().get("status").get("host_ip")
+        hostIp = pod.to_dict()["status"]["host_ip"]
         assert hostIp is not None
         return hostIp
     except ApiException as e:

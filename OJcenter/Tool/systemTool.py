@@ -21,6 +21,8 @@ _cf = configparser.ConfigParser()
 _cf.read(sys.path[0] + "/OJcenter/Tool/config.ini")
 _startPort = int(_cf.get("portconfig", "startport"))
 _endPort = int(_cf.get("portconfig", "endport"))
+_maxUser = int(_cf.get("portconfig", "maxuser"))
+_maxNum = int(_cf.get("portconfig", "maxNum"))
 
 
 def _init():
@@ -59,25 +61,24 @@ def judgeSpace():
     global _orderDict
     global _occupiedPort
     global _createdPort
-    return True
-    # if len(_occupiedPort) > 0 and _occupiedPort[0] == None:
-    #     return False
-    # cf = getConfiguration()
-    # maxuser = int(cf.get("portconfig", "maxuser"))
-    # if len(_orderDict) > 0 and len(_createdPort) > 0 and len(_occupiedPort) < maxuser:
-    #     return True
-    # else:
-    #     return False
+    if len(_occupiedPort) > 0 and _occupiedPort[0] is None:
+        return False
+    if len(_orderDict) > 0 and len(_createdPort) > 0 and len(_occupiedPort) < _maxUser:
+        return True
+    else:
+        return False
 
 
 def refreshDict():
     global _orderDict
     while True:
         try:
+            # 排队学生：[2019040420, 2019040419, ...]
             orderList = redisTool.getOrdeList()
             orderDictTemp = {}
             for index in range(len(orderList)):
                 orderDictTemp[orderList[index]] = index + 1
+            # {2019040420: 1, 2019040419: 2, ...}
             _orderDict = orderDictTemp
 
             # 把排队中的人划拨到已用人群

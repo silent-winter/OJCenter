@@ -24,18 +24,9 @@ _Str_User_File_Save_Mode = "FileSaveMode"
 _strPodMetaInfo = "pod:metaInfo:"
 _strPodPortList = "pod:portList"
 
-r = redis.Redis(host='localhost', port=6379, decode_responses=True)
-pool = ThreadPoolExecutor(max_workers=10)
-
-
-# 把用户放进队列
-def connectRedis():
-    if platform.system() == 'Windows':
-        return redis.Redis(host='81.70.8.85', port=6379, decode_responses=True)
-    elif platform.system() == 'Linux':
-        return redis.Redis(host='localhost', port=6379, decode_responses=True)
-    else:
-        return redis.Redis(host='localhost', port=6379, decode_responses=True, password="kujiji555")
+pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
+r = redis.Redis(connection_pool=pool)
+executor = ThreadPoolExecutor(max_workers=10)
 
 
 def existPod(port):
@@ -91,14 +82,8 @@ def insertUser(username):
         print(username, "已在使用docker")
         return "已经在使用了，不能排队"
     if r.exists('vsUserList'):
-        length = r.llen('vsUserList')
-        userList = r.lrange('vsUserList', 0, length)
-        find = False
-        for item in userList:
-            if item == username:
-                find = True
-                break
-        if find:
+        userList = r.lrange('vsUserList', 0, -1)
+        if username in userList:
             print(username, "已存在")
             return "已经在队列中了"
         else:
@@ -143,13 +128,10 @@ def popUser():
             # targetPort = 1000
 
             targetTokens = createToken()
-            # r.hmset(_strLoginUser + targetUser, {"ip": hostIp, "port": targetPort, "pvPath": pvPath, "token": targetTokens})
             r.set(_Str_User_to_Port + targetUser, targetPort)
             r.set(_Str_User_to_Token + targetUser, targetTokens)
-
             r.set(_Str_Port_to_User + targetPort, targetUser)
             r.set(_Str_Port_Start_Time + targetPort, int(time.time()))
-
             r.set(targetTokens, targetPort, ex=ex_time)
 
             if systemTool.checkContestVerify(targetUser):
@@ -225,7 +207,7 @@ def removeUser(username):
                 #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
                 # ), ())
                 # 线程池提交任务
-                pool.submit(autoCreatePermanentPod, name, pvcName, targetPort, pvPath)
+                executor.submit(autoCreatePermanentPod, name, pvcName, targetPort, pvPath)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
