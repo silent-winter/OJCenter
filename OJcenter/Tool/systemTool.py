@@ -60,10 +60,9 @@ def getOrder(item):
 def judgeSpace():
     global _orderDict
     global _occupiedPort
-    global _createdPort
     if len(_occupiedPort) > 0 and _occupiedPort[0] is None:
         return False
-    if len(_orderDict) > 0 and len(_createdPort) > 0 and len(_occupiedPort) < _maxUser:
+    if len(_orderDict) > 0 and len(_occupiedPort) < _maxUser:
         return True
     else:
         return False
@@ -266,7 +265,7 @@ def getPHPUserName(PHPSESSID):
 
 
 def checkLogin(request):
-    return "appmlk"
+    return request.headers.get("login-user")
     # if platform.system() == 'Windows':
     #     return "appmlk"
     # elif(platform.system() == 'Linux'):
