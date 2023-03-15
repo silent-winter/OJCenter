@@ -123,19 +123,19 @@ def cleanOccupied():
 #     cleanOccupiedMutex.release()
 #     return port
 
-def getOneContainer():
-    global _createdPort
-    global _occupiedPort
-    cleanOccupiedMutex.acquire()
-    createNewDockerMutex.acquire()
-    targetPort = -1
-    if len(_createdPort) > 0:
-        targetPort = _createdPort[0]
-        _createdPort.remove(targetPort)
-        _occupiedPort.append(targetPort)
-    createNewDockerMutex.release()
-    cleanOccupiedMutex.release()
-    return targetPort
+# def getOneContainer():
+#     global _createdPort
+#     global _occupiedPort
+#     cleanOccupiedMutex.acquire()
+#     createNewDockerMutex.acquire()
+#     targetPort = -1
+#     if len(_createdPort) > 0:
+#         targetPort = _createdPort[0]
+#         _createdPort.remove(targetPort)
+#         _occupiedPort.append(targetPort)
+#     createNewDockerMutex.release()
+#     cleanOccupiedMutex.release()
+#     return targetPort
 
 
 def IsOpen(port, ip="127.0.0.1"):
@@ -173,23 +173,23 @@ def login(username, password):
     return False
 
 
-def initCreatedDockerPort():
-    global _createdPort
-
-    createNewDockerMutex.acquire()
-    for index in range(sys.maxsize):
-        if _startPort <= index <= _endPort:
-            if dockerTool.dockerExist(index):
-                _createdPort.append(index)
-                print(index, "初始化存在")
-        if index > _endPort:
-            break
-
-    portList = redisTool.getPortList()
-    for item in portList:
-        if item in _createdPort:
-            _createdPort.remove(item)
-    createNewDockerMutex.release()
+# def initCreatedDockerPort():
+#     global _createdPort
+#
+#     createNewDockerMutex.acquire()
+#     for index in range(sys.maxsize):
+#         if _startPort <= index <= _endPort:
+#             if dockerTool.dockerExist(index):
+#                 _createdPort.append(index)
+#                 print(index, "初始化存在")
+#         if index > _endPort:
+#             break
+#
+#     portList = redisTool.getPortList()
+#     for item in portList:
+#         if item in _createdPort:
+#             _createdPort.remove(item)
+#     createNewDockerMutex.release()
 
 
 # 根据配置文件初始化pod
@@ -203,13 +203,13 @@ def isPermanentPort(port):
     return _startPort <= port <= _endPort
 
 
-def refreshCreatedPort():
-    try:
-        _init()
-        initCreatedDockerPort()
-        _thread.start_new_thread(refreshCreatedDockerPort, ())
-    except:
-        print("Error: 无法启动线程")
+# def refreshCreatedPort():
+#     try:
+#         _init()
+#         initCreatedDockerPort()
+#         _thread.start_new_thread(refreshCreatedDockerPort, ())
+#     except:
+#         print("Error: 无法启动线程")
 
 
 def waitUntilFinished(targetPort):
@@ -225,28 +225,28 @@ def waitUntilFinished(targetPort):
     return False
 
 
-def refreshCreatedDockerPort():
-    global _createdPort
-    while True:
-        try:
-            if _endPort > _startPort:
-                for index in range(sys.maxsize):
-                    if _startPort <= index <= _endPort:
-                        if not dockerTool.dockerExist(index):
-                            if not IsOpen(index):
-                                targetPort = dockerTool.createContainerWait(index)
-                                if targetPort != -1:
-                                    waitUntilFinished(targetPort)
-                                    createNewDockerMutex.acquire()
-
-                                    _createdPort.append(targetPort)
-
-                                    createNewDockerMutex.release()
-                    if index > _endPort:
-                        break
-        except Exception as e:
-            print(e)
-        time.sleep(1)
+# def refreshCreatedDockerPort():
+#     global _createdPort
+#     while True:
+#         try:
+#             if _endPort > _startPort:
+#                 for index in range(sys.maxsize):
+#                     if _startPort <= index <= _endPort:
+#                         if not dockerTool.dockerExist(index):
+#                             if not IsOpen(index):
+#                                 targetPort = dockerTool.createContainerWait(index)
+#                                 if targetPort != -1:
+#                                     waitUntilFinished(targetPort)
+#                                     createNewDockerMutex.acquire()
+#
+#                                     _createdPort.append(targetPort)
+#
+#                                     createNewDockerMutex.release()
+#                     if index > _endPort:
+#                         break
+#         except Exception as e:
+#             print(e)
+#         time.sleep(1)
 
 
 def getPHPUserName(PHPSESSID):

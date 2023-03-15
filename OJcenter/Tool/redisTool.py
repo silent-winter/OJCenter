@@ -8,7 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import redis  # 导入redis 模块
 from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
-from OJcenter.Tool.model import PodMetaInfo
+from OJcenter.model import PodMetaInfo
 
 ex_time = 15 * 60
 # ex_time = 1 * 30

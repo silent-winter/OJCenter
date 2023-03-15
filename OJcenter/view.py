@@ -1,6 +1,7 @@
 # coding=utf-8
 from __future__ import division
 
+import base64
 import os
 
 import time
@@ -21,12 +22,10 @@ utc_tz = timezone('UTC')
 def getVsCodeUrl(request):
     username = systemTool.checkLogin(request)
     if username == None:
-        faileddict = {"result": -100, "sourceUrl": ""}
+        faileddict = {"result": -100, "info": ""}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
     ip, port = redisTool.getSourceUrl(username)
-    url = "http://%s:%s" % (ip, port)
-    result = {"result": 1, "sourceUrl": url}
-    print(result)
+    result = {"result": 1, "ip": ip, "port": port}
     return HttpResponse(json.dumps(result), content_type="application/json")
 
 

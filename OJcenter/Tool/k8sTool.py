@@ -10,7 +10,7 @@ from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
 from kubernetes.client.rest import ApiException
 
 from OJcenter.Tool import aesTool, timeTool, redisTool
-from OJcenter.Tool.model import PodMetaInfo
+from OJcenter.model import PodMetaInfo
 
 # 获取apiserver token
 # kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
@@ -75,9 +75,7 @@ def create(port) -> Optional[PodMetaInfo]:
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
-    os.system("cp -rp /nfs/data/base/.vscode " + pvPath)
-    os.system("cp -rp /nfs/data/base/answer " + pvPath)
-    os.system("cp -rp /nfs/data/base/test " + pvPath)
+    os.system("cp -rp /nfs/data/base/*  %s/" % pvPath)
     return PodMetaInfo(getHostIp(podName), port, podName, pvPath)
 
 
@@ -105,10 +103,8 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
               mountPath: "/config/workspace"
           resources:
             limits:
-              cpu: "1"
               memory: "1Gi"
             requests:
-              cpu: "0.5"
               memory: "512Mi"
       volumes:
         - name: answer-volume
@@ -116,8 +112,8 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
            claimName: pvc-1
     """
     body = eval(
-        '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20220330:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
-            hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace"}]}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
+        '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20230312:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
+            hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace"}],"resources":{"limits":{"memory":"1Gi"},"requests":{"memory":"512Mi"}}}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
     return pod
 
@@ -198,8 +194,7 @@ def copyPermanentFolder(username, pvPath):
     shutil.rmtree(pvPath + "/answer")
     shutil.copytree(userPath, pvPath + "/answer")
     # 设置文件所有者
-    os.system("chown -R 911 %s/answer" % pvPath)
-    os.system("chgrp -R 911 %s/answer" % pvPath)
+    os.system("chown -R 911:911 %s/answer" % pvPath)
     currTime = timeTool.getCurrTime()
     authFile = "/dockerdir/userfolder/%s/authorization" % username
     if os.path.exists(authFile):
