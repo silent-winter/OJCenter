@@ -34,7 +34,7 @@ appsApi = client.AppsV1Api(client.ApiClient(configuration))
 
 # 记录最后一个pod的主机端口
 _port = 0
-_maxPort = 50000
+_maxPort = 32610
 _end = -1
 
 
@@ -69,17 +69,18 @@ def create(port) -> Optional[PodMetaInfo]:
     if redisTool.existPod(port):
         return None
     pvcName = "pvc-%s" % port
-    podName = "server-%s" % port
     createPvc(pvcName)
-    createPod(podName, port, pvcName)
+    createPod(port)
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
-    os.system("cp -rp /nfs/data/base/*  %s/" % pvPath)
-    return PodMetaInfo(getHostIp(podName), port, podName, pvPath)
+    os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
+    os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
+    os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
+    return PodMetaInfo(port, pvPath)
 
 
-def createPod(podName, hostPort, pvcName) -> V1Pod:
+def createPod(port) -> V1Pod:
     # http://www.json2yaml.com/ yaml转json
     # https://www.json.cn/json/jsonzip.html 压缩json
     """
@@ -87,33 +88,32 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
     kind: Pod
     metadata:
       namespace: default
-      name: server-1
+      name: server-30000
       labels:
         app: oj-k8s-server
+        id: "30000"
     spec:
       containers:
-        - name: server-1
-          image: server_20220330:latest
+        - name: server-30000
+          image: server_20230323:latest
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8443
-              hostPort: 10000
+              name: vscode
           volumeMounts:
-            - name: answer-volume
+            - name: workspace-volume
               mountPath: "/config/workspace"
           resources:
             limits:
-              memory: "1Gi"
-            requests:
               memory: "512Mi"
+            requests:
+              memory: "384Mi"
       volumes:
-        - name: answer-volume
+        - name: workspace-volume
           persistentVolumeClaim:
-           claimName: pvc-1
+           claimName: pvc-30000
     """
-    body = eval(
-        '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
-            hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace"}],"resources":{"limits":{"memory":"1Gi"},"requests":{"memory":"512Mi"}}}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
+    body = eval('{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"server-%s","labels":{"app":"oj-k8s-server","id":"%s"}},"spec":{"containers":[{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"name":"vscode"}],"volumeMounts":[{"name":"workspace-volume","mountPath":"/config/workspace"}],"resources":{"limits":{"memory":"512Mi"},"requests":{"memory":"384Mi"}}}],"volumes":[{"name":"workspace-volume","persistentVolumeClaim":{"claimName":"pvc-%s"}}]}}' % (port, port, port, port))
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
     return pod
 

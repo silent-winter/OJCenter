@@ -18,7 +18,7 @@ configuration.api_key = {"authorization": "Bearer " + token}
 client.Configuration.set_default(configuration)
 
 coreApi = client.CoreV1Api(client.ApiClient(configuration))
-start, end = 10000, 10000
+start, end = 30000, 30010
 windows = []
 
 
@@ -43,8 +43,7 @@ def test1():
 
 def test2():
     for i in range(start, end + 1):
-        ip = getHostIp("server-" + str(i))
-        url = ip + ":" + str(i)
+        url = "http://202.4.155.97:" + str(i)
         windows.append(url)
     driver = webdriver.Chrome()
     # 打开 code-server 页面

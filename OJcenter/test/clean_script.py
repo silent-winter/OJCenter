@@ -16,8 +16,9 @@ configuration.api_key = {"authorization": "Bearer " + token}
 client.Configuration.set_default(configuration)
 
 coreApi = client.CoreV1Api(client.ApiClient(configuration))
-start, end = 10000, 10030
+start, end = 30000, 30010
 
 if __name__ == '__main__':
     for i in range(start, end + 1):
         coreApi.delete_namespaced_pod(name="server-" + str(i), namespace="default")
+        # coreApi.delete_namespaced_service(name="svc-" + str(i), namespace="default")

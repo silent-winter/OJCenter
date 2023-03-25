@@ -36,7 +36,7 @@ def existPod(port):
 def savePod(pod):
     if pod is None:
         return
-    r.hmset(_strPodMetaInfo + str(pod.port), {"ip": pod.ip, "port": pod.port, "name": pod.name, "pvPath": pod.pvPath})
+    r.hmset(_strPodMetaInfo + str(pod.port), {"port": pod.port, "pvPath": pod.pvPath})
     r.lpush(_strPodPortList, pod.port)
 
 
@@ -50,8 +50,8 @@ def getPod():
 
 
 def getPodByPort(port):
-    ip, port, name, pvPath = r.hmget(_strPodMetaInfo + str(port), ["ip", "port", "name", "pvPath"])
-    return PodMetaInfo(ip, port, name, pvPath)
+    port, pvPath = r.hmget(_strPodMetaInfo + str(port), ["port", "pvPath"])
+    return PodMetaInfo(port, pvPath)
 
 
 def checkUserInList(username):
@@ -119,7 +119,7 @@ def popUser():
             # targetPort=dockerTool.createContainer()
             podInfo = getPod()
             print(podInfo)
-            hostIp, targetPort, pvPath = podInfo.ip, podInfo.port, podInfo.pvPath
+            targetPort, pvPath = podInfo.port, podInfo.pvPath
             if targetPort == -1:
                 return -1, -1
 
@@ -154,7 +154,7 @@ def popUser():
 
 def getSourceUrl(username):
     port = r.get(_Str_User_to_Port + username)
-    return r.hmget(_strPodMetaInfo + str(port), ["ip", "port"])
+    return "202.4.155.97", port
 
 
 # 查询用户当前是否正在使用Dokcer
@@ -181,7 +181,7 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
-            pvPath, name = r.hmget(_strPodMetaInfo + targetPort, ["pvPath", "name"])
+            pvPath = r.hget(_strPodMetaInfo + targetPort, "pvPath")
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
@@ -193,6 +193,7 @@ def removeUser(username):
             # dockerTool.removeContainer(targetPort)
             # 删除pod, pvc, pv
             pvcName = "pvc-" + targetPort
+            name = "server-" + targetPort
             k8sTool.deletePod(name)
             r.delete(_strPodMetaInfo + targetPort)
             if not systemTool.isPermanentPort(int(targetPort)):
@@ -200,6 +201,7 @@ def removeUser(username):
                 k8sTool.deletePvc(pvcName)
                 os.system("rm -rf " + pvPath)
             else:
+                print("podName=%s is permanent pod, will recreate soon" % name)
                 # 常驻节点, 重新创建
                 # _thread.start_new_thread(lambda: (
                 #     time.sleep(20),
@@ -207,7 +209,7 @@ def removeUser(username):
                 #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
                 # ), ())
                 # 线程池提交任务
-                executor.submit(autoCreatePermanentPod, name, pvcName, targetPort, pvPath)
+                executor.submit(autoCreatePermanentPod, name, targetPort, pvPath)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
@@ -228,11 +230,11 @@ def removeUser(username):
 
 
 # 异步线程池创建pod
-def autoCreatePermanentPod(name, pvcName, port, pvPath):
+def autoCreatePermanentPod(name, port, pvPath):
     while k8sTool.isPodExist(name):
         time.sleep(10)
-    k8sTool.createPod(name, port, pvcName)
-    savePod(PodMetaInfo(k8sTool.getHostIp(name), port, name, pvPath))
+    k8sTool.createPod(port)
+    savePod(PodMetaInfo(port, pvPath))
 
 
 def checkToken():
