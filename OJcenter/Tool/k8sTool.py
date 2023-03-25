@@ -112,7 +112,7 @@ def createPod(podName, hostPort, pvcName) -> V1Pod:
            claimName: pvc-1
     """
     body = eval(
-        '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20230312:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
+        '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"' + podName + '","labels":{"app":"oj-k8s-server"}},"spec":{"containers":[{"name":"' + podName + '","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"hostPort":' + str(
             hostPort) + '}],"volumeMounts":[{"name":"answer-volume","mountPath":"/config/workspace"}],"resources":{"limits":{"memory":"1Gi"},"requests":{"memory":"512Mi"}}}],"volumes":[{"name":"answer-volume","persistentVolumeClaim":{"claimName":"' + pvcName + '"}}]}}')
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
     return pod
