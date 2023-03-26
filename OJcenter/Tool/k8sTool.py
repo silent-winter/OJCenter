@@ -1,6 +1,7 @@
 import json
 import os
 import shutil
+import time
 from typing import Optional
 import urllib3
 
@@ -49,6 +50,7 @@ def init(start, end):
         pod = create(i)
         if pod is not None:
             result.append(pod)
+        time.sleep(2)
     return result
 
 
@@ -76,21 +78,26 @@ def create(port) -> Optional[PodMetaInfo]:
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
-    os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
-    os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
-    os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
+    # os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
+    # os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
+    # os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
     return PodMetaInfo(port, pvPath)
 
 
 def createPod(port) -> V1Pod:
     # http://www.wetools.com/yaml/ yaml转json
     # https://www.json.cn/json/jsonzip.html 压缩json
-    nodes = json.loads(context.getConfigValue("node-config", "hosts"))
+    nodes = context.getAllKeys("node-config")
     # 设置节点亲和性
     affinity = ','.join(
-        '{{"preference":{{"matchExpressions":[{{"key":"{}/vscode-limit","operator":"Gt","values":["{}"]}}]}},"weight":5}}'.format(
-            node, podCountByNodeName(node)) for node in nodes)
-    bodyStr = '{{"apiVersion":"v1","kind":"Pod","metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"containers":[{{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi"}},"requests":{{"memory":"300Mi"}}}}}}],"volumes":[{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}'.format(
+        [
+            '{{"preference":{{"matchExpressions":[{{"key":"{}/vscode-limit","operator":"Gt","values":["{}"]}}]}},"weight":{}}}'.format(
+                node, podCountByNodeName(node), context.getConfigValue("node-config", node)
+            )
+            for node in nodes
+        ]
+    )
+    bodyStr = '{{"apiVersion":"v1","kind":"Pod","metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi"}},"requests":{{"memory":"300Mi"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}'.format(
         affinity) % (port, port, port, port)
     body = eval(bodyStr)
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
@@ -176,10 +183,12 @@ def podCountByNodeName(nodeName):
 
 def copyPermanentFolder(username, pvPath):
     userPath = "/dockerdir/userfolder/%s/answer" % username
-    shutil.rmtree(pvPath + "/answer")
-    shutil.copytree(userPath, pvPath + "/answer")
+    answerPath = pvPath + "/answer"
+    if os.path.exists(answerPath):
+        shutil.rmtree(answerPath)
+    shutil.copytree(userPath, answerPath)
     # 设置文件所有者
-    os.system("chown -R 911:911 %s/answer" % pvPath)
+    os.system("chown -R nobody:nogroup %s/answer" % pvPath)
     currTime = timeTool.getCurrTime()
     authFile = "/dockerdir/userfolder/%s/authorization" % username
     if os.path.exists(authFile):
@@ -191,7 +200,9 @@ def copyPermanentFolder(username, pvPath):
 
 
 def backupAnswer(userPath, pvPath):
-    shutil.copytree(pvPath + "/answer", userPath)
+    answerPath = pvPath + "/answer"
+    if os.path.exists(answerPath):
+        shutil.copytree(answerPath, userPath)
 
 
 def getTargetFile(port, language):

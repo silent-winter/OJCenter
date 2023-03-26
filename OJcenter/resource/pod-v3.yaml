@@ -1,0 +1,59 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: default
+  name: server-%s
+  labels:
+    app: oj-k8s-server
+    id: "%s"
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - preference:
+          matchExpressions:
+          - key: node2/vscode-limit
+            operator: Gt
+            values: ["%s"]
+        weight: 5
+      - preference:
+          matchExpressions:
+          - key: node3/vscode-limit
+            operator: Gt
+            values: ["%s"]
+        weight: 5
+  initContainers:
+  - name: init-server
+    image: server_20230323:latest
+    imagePullPolicy: IfNotPresent
+    command: ["/bin/sh", "-c", "cp -R /config/workspace/. /mnt"]
+    volumeMounts:
+    - name: shared-workspace
+      mountPath: "/mnt"
+  containers:
+  - name: server-%s
+    image: server_20230323:latest
+    imagePullPolicy: IfNotPresent
+    lifecycle:
+      postStart:
+        exec:
+          command: ["/bin/sh", "-c", "cp -R /mnt/. /config/workspace"]
+    ports:
+    - name: vscode
+      containerPort: 8443
+    volumeMounts:
+    - name: shared-workspace
+      mountPath: "/mnt"
+    - name: workspace-volume
+      mountPath: "/config/workspace"
+    resources:
+      limits:
+        memory: "512Mi"
+      requests:
+        memory: "300Mi"
+  volumes:
+  - name: shared-workspace
+    emptyDir: {}
+  - name: workspace-volume
+    persistentVolumeClaim:
+      claimName: pvc-%s

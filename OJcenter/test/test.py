@@ -1,4 +1,5 @@
 import json
+import shutil
 
 import urllib3
 from selenium import webdriver
@@ -65,4 +66,4 @@ def test2():
 
 
 if __name__ == '__main__':
-    test2()
+    shutil.copytree("../resource", "./answer")
