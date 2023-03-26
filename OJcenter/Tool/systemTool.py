@@ -9,6 +9,7 @@ import time
 import json
 import requests
 
+from OJcenter import context
 from OJcenter.Tool import redisTool, permanentTool, dockerTool, k8sTool
 
 create_wait_times = 20
@@ -17,12 +18,10 @@ _createdPort = []
 _occupiedPort = [None]
 _result = []
 # 初始化配置文件
-_cf = configparser.ConfigParser()
-_cf.read(sys.path[0] + "/OJcenter/Tool/config.ini")
-_startPort = int(_cf.get("portconfig", "startport"))
-_endPort = int(_cf.get("portconfig", "endport"))
-_maxUser = int(_cf.get("portconfig", "maxuser"))
-_maxNum = int(_cf.get("portconfig", "maxNum"))
+_startPort = int(context.getConfigValue("portconfig", "startport"))
+_endPort = int(context.getConfigValue("portconfig", "endport"))
+_maxUser = int(context.getConfigValue("portconfig", "maxuser"))
+_maxNum = int(context.getConfigValue("portconfig", "maxNum"))
 
 
 def _init():

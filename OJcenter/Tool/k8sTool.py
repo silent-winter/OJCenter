@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 from typing import Optional
@@ -9,6 +10,7 @@ from kubernetes import client
 from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
 from kubernetes.client.rest import ApiException
 
+from OJcenter import context
 from OJcenter.Tool import aesTool, timeTool, redisTool
 from OJcenter.model import PodMetaInfo
 
@@ -81,39 +83,16 @@ def create(port) -> Optional[PodMetaInfo]:
 
 
 def createPod(port) -> V1Pod:
-    # http://www.json2yaml.com/ yaml转json
+    # http://www.wetools.com/yaml/ yaml转json
     # https://www.json.cn/json/jsonzip.html 压缩json
-    """
-    apiVersion: v1
-    kind: Pod
-    metadata:
-      namespace: default
-      name: server-30000
-      labels:
-        app: oj-k8s-server
-        id: "30000"
-    spec:
-      containers:
-        - name: server-30000
-          image: server_20230323:latest
-          imagePullPolicy: IfNotPresent
-          ports:
-            - containerPort: 8443
-              name: vscode
-          volumeMounts:
-            - name: workspace-volume
-              mountPath: "/config/workspace"
-          resources:
-            limits:
-              memory: "512Mi"
-            requests:
-              memory: "384Mi"
-      volumes:
-        - name: workspace-volume
-          persistentVolumeClaim:
-           claimName: pvc-30000
-    """
-    body = eval('{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"server-%s","labels":{"app":"oj-k8s-server","id":"%s"}},"spec":{"containers":[{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"containerPort":8443,"name":"vscode"}],"volumeMounts":[{"name":"workspace-volume","mountPath":"/config/workspace"}],"resources":{"limits":{"memory":"512Mi"},"requests":{"memory":"384Mi"}}}],"volumes":[{"name":"workspace-volume","persistentVolumeClaim":{"claimName":"pvc-%s"}}]}}' % (port, port, port, port))
+    nodes = json.loads(context.getConfigValue("node-config", "hosts"))
+    # 设置节点亲和性
+    affinity = ','.join(
+        '{{"preference":{{"matchExpressions":[{{"key":"{}/vscode-limit","operator":"Gt","values":["{}"]}}]}},"weight":5}}'.format(
+            node, podCountByNodeName(node)) for node in nodes)
+    bodyStr = '{{"apiVersion":"v1","kind":"Pod","metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"containers":[{{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi"}},"requests":{{"memory":"300Mi"}}}}}}],"volumes":[{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}'.format(
+        affinity) % (port, port, port, port)
+    body = eval(bodyStr)
     pod = coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
     return pod
 
@@ -187,6 +166,12 @@ def listPodForAllNamespaces() -> V1PodList:
 def isPodExist(podName):
     podList = coreApi.list_namespaced_pod(field_selector=f'metadata.name={podName}', namespace="default")
     return len(podList.items) == 1
+
+
+def podCountByNodeName(nodeName):
+    podList = coreApi.list_namespaced_pod(field_selector=f'spec.nodeName={nodeName}', namespace="default",
+                                          label_selector='app=oj-k8s-server')
+    return len(podList.items)
 
 
 def copyPermanentFolder(username, pvPath):

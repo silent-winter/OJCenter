@@ -18,7 +18,7 @@ configuration.api_key = {"authorization": "Bearer " + token}
 client.Configuration.set_default(configuration)
 
 coreApi = client.CoreV1Api(client.ApiClient(configuration))
-start, end = 30000, 30010
+start, end = 30000, 30015
 
 driver = webdriver.Chrome()
 
@@ -28,32 +28,18 @@ def getHostIp(podName):
     return pod.to_dict()["status"]["host_ip"]
 
 
+def podCountByNodeName(nodeName):
+    podList = coreApi.list_namespaced_pod(field_selector=f'spec.nodeName={nodeName}', namespace="default",
+                                          label_selector='app=oj-k8s-server')
+    return len(podList.items)
+
+
 if __name__ == '__main__':
-    """
-    apiVersion: v1
-    kind: Pod
-    metadata:
-      namespace: default
-      name: server-30000
-      labels:
-        app: oj-k8s-server
-        id: "30000"
-    spec:
-      containers:
-        - name: server-30000
-          image: server_20230323:latest
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: vscode
-              containerPort: 8443
-          resources:
-            limits:
-              memory: "512Mi"
-            requests:
-              memory: "384Mi"
-    """
     for i in range(start, end + 1):
-        body = eval('{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"server-%s","labels":{"app":"oj-k8s-server","id":"%s"}},"spec":{"containers":[{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"name":"vscode","containerPort":8443}],"resources":{"limits":{"memory":"512Mi"},"requests":{"memory":"384Mi"}}}]}}' % (i, i, i))
+        x, y = podCountByNodeName("node2"), podCountByNodeName("node3")
+        # bodyStr = '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"server-%s","labels":{"app":"oj-k8s-server","id":"%s"}},"spec":{"affinity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"node2/vscode-limit","operator":"Gt","values":["%s"]}]},{"matchExpressions":[{"key":"node3/vscode-limit","operator":"Gt","values":["%s"]}]}]}}},"containers":[{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"name":"vscode","containerPort":8443}],"resources":{"limits":{"memory":"512Mi"},"requests":{"memory":"300Mi"}}}]}}' % (i, i, x, y, i)
+        bodyStr = '{"apiVersion":"v1","kind":"Pod","metadata":{"namespace":"default","name":"server-%s","labels":{"app":"oj-k8s-server","id":"%s"}},"spec":{"affinity":{"nodeAffinity":{"preferredDuringSchedulingIgnoredDuringExecution":[{"preference":{"matchExpressions":[{"key":"node2/vscode-limit","operator":"Gt","values":["%s"]}]},"weight":5},{"preference":{"matchExpressions":[{"key":"node3/vscode-limit","operator":"Gt","values":["%s"]}]},"weight":5}]}},"containers":[{"name":"server-%s","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","ports":[{"name":"vscode","containerPort":8443}],"resources":{"limits":{"memory":"512Mi"},"requests":{"memory":"300Mi"}}}]}}' % (i, i, x, y, i)
+        body = eval(bodyStr)
         coreApi.create_namespaced_pod(body=body, namespace="default", async_req=False)
         time.sleep(5)
         ip = getHostIp("server-" + str(i))

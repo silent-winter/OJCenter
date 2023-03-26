@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  namespace: default
+  name: server-%s
+  labels:
+    app: oj-k8s-server
+    id: "%s"
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: node2/vscode-limit
+            operator: Gt
+            values: ["0"]
+        - matchExpressions:
+          - key: node3/vscode-limit
+            operator: Gt
+            values: ["0"]
+  containers:
+  - name: server-%s
+    image: server_20230323:latest
+    imagePullPolicy: IfNotPresent
+    ports:
+    - name: vscode
+      containerPort: 8443
+    resources:
+      limits:
+        memory: "512Mi"
+      requests:
+        memory: "300Mi"
