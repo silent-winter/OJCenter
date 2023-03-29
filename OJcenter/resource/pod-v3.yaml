@@ -15,13 +15,13 @@ spec:
           - key: node2/vscode-limit
             operator: Gt
             values: ["%s"]
-        weight: 5
+        weight: %s
       - preference:
           matchExpressions:
           - key: node3/vscode-limit
             operator: Gt
             values: ["%s"]
-        weight: 5
+        weight: %s
   initContainers:
   - name: init-server
     image: server_20230323:latest
@@ -31,7 +31,7 @@ spec:
     - name: shared-workspace
       mountPath: "/mnt"
   containers:
-  - name: server-%s
+  - name: server
     image: server_20230323:latest
     imagePullPolicy: IfNotPresent
     lifecycle:
