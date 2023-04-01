@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import time
@@ -81,8 +82,9 @@ def create(port) -> Optional[PodMetaInfo]:
     # os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
-    print("create pod success, port=%s, pvPath=%s" % (port, pvPath))
-    return PodMetaInfo(port, pvPath, getClusterIp(svcName))
+    clusterIp = getClusterIp(svcName)
+    logging.info("create pod success, port=%s, pvPath=%s, clusterIp=%s" % (port, pvPath, clusterIp))
+    return PodMetaInfo(port, pvPath, clusterIp)
 
 
 def createPod(port) -> V1Pod:
@@ -109,7 +111,7 @@ def deletePod(name) -> V1Pod:
     try:
         return coreApi.delete_namespaced_pod(name, "default")
     except ApiException as e:
-        print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
+        logging.error("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
 
 
 def createPvc(pvcName) -> Optional[V1PersistentVolumeClaim]:
@@ -127,7 +129,7 @@ def createPvc(pvcName) -> Optional[V1PersistentVolumeClaim]:
       storageClassName: managed-nfs-storage
     """
     if isPvcExist(pvcName):
-        print("pvcName=" + pvcName + " is exist")
+        logging.info("pvcName=" + pvcName + " is exist")
         return None
     body = eval(
         '{"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"name":"' + pvcName + '"},"spec":{"resources":{"requests":{"storage":"10M"}},"accessModes":["ReadWriteMany"],"storageClassName":"managed-nfs-storage"}}')
@@ -139,7 +141,7 @@ def deletePvc(pvcName):
     try:
         return coreApi.delete_namespaced_persistent_volume_claim(pvcName, "default")
     except ApiException as e:
-        print("Exception when calling CoreV1Api->delete_namespaced_persistent_volume_claim: %s\n" % e)
+        logging.error("Exception when calling CoreV1Api->delete_namespaced_persistent_volume_claim: %s\n" % e)
 
 
 @retry(tries=5, delay=1)
@@ -150,7 +152,7 @@ def getPvName(pvcName):
         assert pvName is not None
         return pvName
     except ApiException as e:
-        print("Exception when calling CoreV1Api->read_namespaced_persistent_volume_claim: %s\n" % e)
+        logging.error("Exception when calling CoreV1Api->read_namespaced_persistent_volume_claim: %s\n" % e)
         return ""
 
 
@@ -162,7 +164,7 @@ def getHostIp(podName):
         assert hostIp is not None
         return hostIp
     except ApiException as e:
-        print("Exception when calling CoreV1Api->read_namespaced_pod: %s\n" % e)
+        logging.error("Exception when calling CoreV1Api->read_namespaced_pod: %s\n" % e)
         return ""
 
 
@@ -173,9 +175,9 @@ def getClusterIp(svcName):
 
 def listPodForAllNamespaces() -> V1PodList:
     podList = coreApi.list_pod_for_all_namespaces(watch=False)
-    print("Listing pods with their IPs:")
+    logging.info("Listing pods with their IPs:")
     for item in podList.items:
-        print("%s\t%s\t%s" % (item.status.pod_ip, item.metadata.namespace, item.metadata.name))
+        logging.info("%s\t%s\t%s" % (item.status.pod_ip, item.metadata.namespace, item.metadata.name))
     return podList
 
 

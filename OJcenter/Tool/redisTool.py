@@ -1,3 +1,4 @@
+import logging
 import os
 import platform
 import threading
@@ -79,12 +80,12 @@ def insertUser(username):
         return "本系统当前被用于考试/比赛，而您未被邀请参加，因此暂时无法使用本系统。如有疑问请联系考试/比赛组织者"
 
     if r.exists(_Str_User_to_Port + username):
-        print(username, "已在使用docker")
+        logging.info(username, "已在使用docker")
         return "已经在使用了，不能排队"
     if r.exists('vsUserList'):
         userList = r.lrange('vsUserList', 0, -1)
         if username in userList:
-            print(username, "已存在")
+            logging.info(username, "已存在")
             return "已经在队列中了"
         else:
             r.lpush('vsUserList', username)
@@ -118,7 +119,7 @@ def popUser():
 
             # targetPort=dockerTool.createContainer()
             podInfo = getPod()
-            print(podInfo)
+            logging.info(podInfo)
             targetPort, pvPath, clusterIp = podInfo.port, podInfo.pvPath, podInfo.clusterIp
             if targetPort == -1:
                 return -1, -1
@@ -197,7 +198,7 @@ def removeUser(username):
                 k8sTool.deletePvc(pvcName)
                 os.system("rm -rf " + pvPath)
             else:
-                print("podName=%s is permanent pod, will recreate soon" % name)
+                logging.info("podName=%s is permanent pod, will recreate soon" % name)
                 # 常驻节点, 重新创建
                 # _thread.start_new_thread(lambda: (
                 #     time.sleep(20),
@@ -220,7 +221,7 @@ def removeUser(username):
             if length > 0:
                 r.lrem('vsUserList', 1, username)
     except Exception as re:
-        print(re)
+        logging.error("Exception in removeUser: \n%s" % re)
     removeUserMutex.release()
     return 1
 
@@ -256,7 +257,7 @@ def checkToken():
             else:
                 _new_occupiedPort.append(targetPort)
         else:
-            print(str(targetPort), "不存在")
+            logging.warning(str(targetPort), "不存在")
     return _new_occupiedPort
 
 

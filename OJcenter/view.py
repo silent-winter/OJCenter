@@ -2,6 +2,7 @@
 from __future__ import division
 
 import base64
+import logging
 import os
 
 import time
@@ -51,7 +52,7 @@ def insertUser(request):
         successdict = {"result": 1, "info": status}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in insertUser: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -74,7 +75,7 @@ def orderResult(request):
             successdict = {"result": 1, "order": 0, "message": templeMessage}
             return successdict
     except Exception as e:
-        print(e)
+        logging.error("Exception in orderResult: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return faileddict
 
@@ -95,7 +96,7 @@ def lockResult(request):
             os.system(command)
             return 0
     except Exception as e:
-        print(e)
+        logging.error("Exception in lockResult: \n%s" % e)
         return 0
 
 
@@ -154,7 +155,7 @@ def removeUser(request):
         ret.delete_cookie("cdrID")
         return ret
     except Exception as e:
-        print(e)
+        logging.error("Exception in removeUser: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -220,7 +221,7 @@ def getUserPort(request):
         successdict = {"result": 1, "port": port}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getUserPort: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -245,7 +246,7 @@ def getUserToken(request):
         successdict = {"result": 1, "token": portToken}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getUserToken: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -268,7 +269,7 @@ def getUseTime(request):
         successdict = {"result": 1, "starttime": startTime, "usetime": useTime}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getUseTime: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -327,7 +328,7 @@ def getSubmitAnswer(request):
         successdict = {"code": 1, "msg": "成功"}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getSubmitAnswer: \n%s" % e)
         faileddict = {"code": -1, "msg": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -377,12 +378,12 @@ def getEditCode(request):
             if str_out is not None and len(str_out) > 0:
                 dockerTool.writeContainerFile(targetPort, str_out, id + "-" + currentTime + "-output", "txt")
         except Exception as e:
-            print(e)
+            logging.error("Exception in getEditCode: \n%s" % e)
 
         successdict = {"code": 1, "msg": "成功"}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getEditCode: \n%s" % e)
         faileddict = {"code": -1, "msg": "获取信息失败，请检查你的登录状态，或当前是否处于考试模式"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -405,7 +406,7 @@ def getMessage(request):
         successdict = {"result": 1, "starttime": startTime, "usetime": useTime}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getMessage: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -424,7 +425,7 @@ def checkStatus(request):
         successdict = {"result": 1}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in checkStatus: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -465,7 +466,7 @@ def getEditCodeUpdate(request):
         successdict = {"result": 1}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getEditCodeUpdate: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -510,7 +511,7 @@ def entercontest(request):
             successdict = {"result": 1, "info": 0}
             return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in entercontest: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -525,7 +526,7 @@ def onlinecount(request):
         successdict = {"result": 1, "info": count}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in onlinecount: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -540,6 +541,6 @@ def getAccessCodeServer(request):
         successdict = {"result": 1, "info": cookie}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
-        print(e)
+        logging.error("Exception in getAccessCodeServer: \n%s" % e)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")

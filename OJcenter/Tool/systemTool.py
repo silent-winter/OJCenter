@@ -1,5 +1,6 @@
 import _thread
 import configparser
+import logging
 import os.path
 import socket
 import sys
@@ -84,7 +85,7 @@ def refreshDict():
                 if judgeSpace():
                     targetUser, targetPort = redisTool.popUser()
         except Exception as re:
-            print(re)
+            logging.error("Exception in refreshDict: \n%s" % re)
         time.sleep(0.1)
 
 
@@ -96,7 +97,7 @@ def cleanOccupied():
         try:
             _occupiedPort = redisTool.checkToken()
         except Exception as re:
-            print(re)
+            logging.error("Exception in cleanOccupied: \n%s" % re)
 
         cleanOccupiedMutex.release()
         time.sleep(5)
