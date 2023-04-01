@@ -15,9 +15,10 @@ class UserstatusDetail(models.Model):
 
 
 class PodMetaInfo:
-    def __init__(self, port, pvPath):
+    def __init__(self, port, pvPath, clusterIp):
         self.port = port
         self.pvPath = pvPath
+        self.clusterIp = clusterIp
 
     def __repr__(self):
-        return "port=%s, pvPath=%s" % (self.port, self.pvPath)
+        return "port=%s, pvPath=%s, clusterIp=%s" % (self.port, self.pvPath, self.clusterIp)

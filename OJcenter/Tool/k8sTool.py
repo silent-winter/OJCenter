@@ -1,4 +1,3 @@
-import json
 import os
 import shutil
 import time
@@ -8,7 +7,7 @@ import urllib3
 from retry import retry
 
 from kubernetes import client
-from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
+from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim, V1Service
 from kubernetes.client.rest import ApiException
 
 from OJcenter import context
@@ -50,7 +49,7 @@ def init(start, end):
         pod = create(i)
         if pod is not None:
             result.append(pod)
-        time.sleep(2)
+            time.sleep(2)
     return result
 
 
@@ -73,6 +72,7 @@ def create(port) -> Optional[PodMetaInfo]:
     if redisTool.existPod(port):
         return None
     pvcName = "pvc-%s" % port
+    svcName = "svc-%s" % port
     createPvc(pvcName)
     createPod(port)
     pvName = getPvName(pvcName)
@@ -81,7 +81,8 @@ def create(port) -> Optional[PodMetaInfo]:
     # os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
-    return PodMetaInfo(port, pvPath)
+    print("create pod success, port=%s, pvPath=%s" % (port, pvPath))
+    return PodMetaInfo(port, pvPath, getClusterIp(svcName))
 
 
 def createPod(port) -> V1Pod:
@@ -111,7 +112,7 @@ def deletePod(name) -> V1Pod:
         print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
 
 
-def createPvc(pvcName) -> V1PersistentVolumeClaim:
+def createPvc(pvcName) -> Optional[V1PersistentVolumeClaim]:
     """
     apiVersion: v1
     kind: PersistentVolumeClaim
@@ -125,6 +126,9 @@ def createPvc(pvcName) -> V1PersistentVolumeClaim:
         - ReadWriteMany
       storageClassName: managed-nfs-storage
     """
+    if isPvcExist(pvcName):
+        print("pvcName=" + pvcName + " is exist")
+        return None
     body = eval(
         '{"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"name":"' + pvcName + '"},"spec":{"resources":{"requests":{"storage":"10M"}},"accessModes":["ReadWriteMany"],"storageClassName":"managed-nfs-storage"}}')
     pvc = coreApi.create_namespaced_persistent_volume_claim(namespace="default", body=body)
@@ -162,6 +166,11 @@ def getHostIp(podName):
         return ""
 
 
+def getClusterIp(svcName):
+    svc = coreApi.read_namespaced_service(name=svcName, namespace="default")
+    return svc.spec.cluster_ip
+
+
 def listPodForAllNamespaces() -> V1PodList:
     podList = coreApi.list_pod_for_all_namespaces(watch=False)
     print("Listing pods with their IPs:")
@@ -173,6 +182,11 @@ def listPodForAllNamespaces() -> V1PodList:
 def isPodExist(podName):
     podList = coreApi.list_namespaced_pod(field_selector=f'metadata.name={podName}', namespace="default")
     return len(podList.items) == 1
+
+
+def isPvcExist(pvcName):
+    pvcList = coreApi.list_namespaced_persistent_volume_claim(field_selector=f'metadata.name={pvcName}', namespace="default")
+    return len(pvcList.items) == 1
 
 
 def podCountByNodeName(nodeName):

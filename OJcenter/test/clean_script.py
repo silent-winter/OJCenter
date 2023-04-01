@@ -20,5 +20,5 @@ start, end = 30000, 30030
 
 if __name__ == '__main__':
     for i in range(start, end + 1):
-        coreApi.delete_namespaced_pod(name="server-" + str(i), namespace="default")
-        # coreApi.delete_namespaced_service(name="svc-" + str(i), namespace="default")
+        # coreApi.delete_namespaced_pod(name="server-" + str(i), namespace="default")
+        coreApi.delete_namespaced_service(name="svc-" + str(i), namespace="default")

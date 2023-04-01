@@ -19,13 +19,12 @@ cst_tz = timezone('Asia/Shanghai')
 utc_tz = timezone('UTC')
 
 
-def getVsCodeUrl(request):
+def getCookie(request):
     username = systemTool.checkLogin(request)
     if username == None:
         faileddict = {"result": -100, "info": ""}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
-    ip, port = redisTool.getSourceUrl(username)
-    result = {"result": 1, "ip": ip, "port": port}
+    result = {"result": 1, "info": redisTool.getPortToken(username)}
     return HttpResponse(json.dumps(result), content_type="application/json")
 
 

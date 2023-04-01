@@ -66,4 +66,8 @@ def test2():
 
 
 if __name__ == '__main__':
-    shutil.copytree("../resource", "./answer")
+    def getClusterIp(svcName):
+        svc = coreApi.read_namespaced_service(name=svcName, namespace="default")
+        return svc.spec.cluster_ip
+
+    print(getClusterIp("svc-30000"))

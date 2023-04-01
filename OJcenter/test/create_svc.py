@@ -17,7 +17,7 @@ configuration.api_key = {"authorization": "Bearer " + token}
 client.Configuration.set_default(configuration)
 
 coreApi = client.CoreV1Api(client.ApiClient(configuration))
-start, end = 30011, 30030
+start, end = 9100, 9130
 
 
 if __name__ == '__main__':
@@ -32,16 +32,15 @@ if __name__ == '__main__':
       selector:
         app: oj-k8s-server
         id: "1"
-      type: NodePort
+      type: ClusterIP
       ports:
       - name: http
-        port: 30000
+        port: 9100
         targetPort: 8443
-        nodePort: 30000
     """
     for i in range(start, end + 1):
         body = eval(
-            '{"apiVersion":"v1","kind":"Service","metadata":{"name":"svc-%s","labels":{"app":"oj-svc"}},"spec":{"selector":{"app":"oj-k8s-server","id":"%s"},"type":"NodePort","ports":[{"name":"http","port":%s,"targetPort":8443,"nodePort":%s}]}}' % (
-                i, i, i, i)
+            '{"apiVersion":"v1","kind":"Service","metadata":{"name":"svc-%s","labels":{"app":"oj-svc"}},"spec":{"selector":{"app":"oj-k8s-server","id":"%s"},"type":"ClusterIP","ports":[{"name":"http","port":%s,"targetPort":8443}]}}' % (
+                i, i, i)
         )
         coreApi.create_namespaced_service(namespace="default", body=body)

@@ -36,7 +36,7 @@ def existPod(port):
 def savePod(pod):
     if pod is None:
         return
-    r.hmset(_strPodMetaInfo + str(pod.port), {"port": pod.port, "pvPath": pod.pvPath})
+    r.hmset(_strPodMetaInfo + str(pod.port), {"port": pod.port, "pvPath": pod.pvPath, "clusterIp": pod.clusterIp})
     r.lpush(_strPodPortList, pod.port)
 
 
@@ -50,8 +50,8 @@ def getPod():
 
 
 def getPodByPort(port):
-    port, pvPath = r.hmget(_strPodMetaInfo + str(port), ["port", "pvPath"])
-    return PodMetaInfo(port, pvPath)
+    port, pvPath, clusterIp = r.hmget(_strPodMetaInfo + str(port), ["port", "pvPath", "clusterIp"])
+    return PodMetaInfo(port, pvPath, clusterIp)
 
 
 def checkUserInList(username):
@@ -119,7 +119,7 @@ def popUser():
             # targetPort=dockerTool.createContainer()
             podInfo = getPod()
             print(podInfo)
-            targetPort, pvPath = podInfo.port, podInfo.pvPath
+            targetPort, pvPath, clusterIp = podInfo.port, podInfo.pvPath, podInfo.clusterIp
             if targetPort == -1:
                 return -1, -1
 
@@ -127,12 +127,13 @@ def popUser():
             # 替换为docker代码
             # targetPort = 1000
 
-            targetTokens = createToken()
+            targetToken = createToken()
             r.set(_Str_User_to_Port + targetUser, targetPort)
-            r.set(_Str_User_to_Token + targetUser, targetTokens)
+            r.set(_Str_User_to_Token + targetUser, targetToken)
             r.set(_Str_Port_to_User + targetPort, targetUser)
             r.set(_Str_Port_Start_Time + targetPort, int(time.time()))
-            r.set(targetTokens, targetPort, ex=ex_time)
+            r.hmset(targetToken, {"clusterIp": clusterIp, "port": targetPort})
+            r.expire(targetToken, ex_time)
 
             if systemTool.checkContestVerify(targetUser):
                 r.set(_Str_User_File_Save_Mode + targetUser, 0)
@@ -150,11 +151,6 @@ def popUser():
             return -1, -1
     else:
         return -1, -1
-
-
-def getSourceUrl(username):
-    port = r.get(_Str_User_to_Port + username)
-    return "202.4.155.97", port
 
 
 # 查询用户当前是否正在使用Dokcer
@@ -181,7 +177,7 @@ def removeUser(username):
             targetPort = r.get(_Str_User_to_Port + username)
             targetToken = r.get(_Str_User_to_Token + username)
 
-            pvPath = r.hget(_strPodMetaInfo + targetPort, "pvPath")
+            pvPath, clusterIp = r.hmget(_strPodMetaInfo + targetPort, ["pvPath", "clusterIp"])
             if r.exists(_Str_User_File_Save_Mode + username) and r.get(_Str_User_File_Save_Mode + username) == 0:
                 pass
             else:
@@ -209,7 +205,7 @@ def removeUser(username):
                 #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
                 # ), ())
                 # 线程池提交任务
-                executor.submit(autoCreatePermanentPod, name, targetPort, pvPath)
+                executor.submit(autoCreatePermanentPod, name, targetPort, pvPath, clusterIp)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
@@ -230,11 +226,11 @@ def removeUser(username):
 
 
 # 异步线程池创建pod
-def autoCreatePermanentPod(name, port, pvPath):
+def autoCreatePermanentPod(name, port, pvPath, clusterIp):
     while k8sTool.isPodExist(name):
         time.sleep(10)
     k8sTool.createPod(port)
-    savePod(PodMetaInfo(port, pvPath))
+    savePod(PodMetaInfo(port, pvPath, clusterIp))
 
 
 def checkToken():
