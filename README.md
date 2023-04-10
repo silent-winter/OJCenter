@@ -1,13 +1,13 @@
 ## 基于Kubernetes的VSCode-OJ云编程环境
 
 #### 后端访问逻辑：
-![后端访问逻辑图](E:\work\大四\毕设\期中\process.png) 
+![后端访问逻辑图](https://vscode-oj.oss-cn-beijing.aliyuncs.com/process.png) 
 
 #### 文件挂载：
-![文件挂载图](E:\work\大四\毕设\期中\NFS&PV.png) 
+![文件挂载图](https://vscode-oj.oss-cn-beijing.aliyuncs.com/NFS%26PV.png) 
 
 #### 节点亲和性，控制每台机器Code-Server部署上限：
-![节点亲和性图](E:\work\大四\毕设\期中\nodeAffinity.png) 
+![节点亲和性图](https://vscode-oj.oss-cn-beijing.aliyuncs.com/nodeAffinity.png) 
 
 #### Pod的yaml定义：
 ```yaml
