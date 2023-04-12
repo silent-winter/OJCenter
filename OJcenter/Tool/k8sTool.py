@@ -69,12 +69,12 @@ def batchCreate(n):
 
 
 def create(port) -> Optional[PodMetaInfo]:
-    if redisTool.existPod(port):
+    if isDeploymentExist(port) and redisTool.existPod(port):
         return None
     pvcName = "pvc-%s" % port
     svcName = "svc-%s" % port
     createPvc(pvcName)
-    createPod(port)
+    createDeployment(port)
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
@@ -105,11 +105,38 @@ def createPod(port) -> V1Pod:
     return pod
 
 
+def createDeployment(port):
+    nodes = context.getAllKeys("node-config")
+    # 设置节点亲和性
+    affinity = ','.join(
+        [
+            '{{"preference":{{"matchExpressions":[{{"key":"{}/vscode-limit","operator":"Gt","values":["{}"]}}]}},"weight":{}}}'.format(
+                node, podCountByNodeName(node), context.getConfigValue("node-config", node)
+            )
+            for node in nodes
+        ]
+    )
+    bodyStr = '{{"apiVersion":"apps/v1","kind":"Deployment","metadata":{{"name":"server-%s","labels":{{"app":"oj-k8s-deployment"}}}},"spec":{{"replicas":1,"selector":{{"matchLabels":{{"app":"oj-k8s-server","id":"%s"}}}},"template":{{"metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi"}},"requests":{{"memory":"300Mi"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}}}}}'.format(
+        affinity) % (port, port, port, port, port)
+    body = eval(bodyStr)
+    try:
+        appsApi.create_namespaced_deployment(body=body, namespace="default")
+    except ApiException as e:
+        print("Exception when calling AppsV1Api->create_namespaced_deployment: %s\n" % e)
+
+
 def deletePod(name) -> V1Pod:
     try:
         return coreApi.delete_namespaced_pod(name, "default")
     except ApiException as e:
         print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
+
+
+def deleteDeployment(name):
+    try:
+        appsApi.delete_namespaced_deployment(name, "default")
+    except ApiException as e:
+        print("Exception when calling CoreV1Api->delete_namespaced_deployment: %s\n" % e)
 
 
 def createPvc(pvcName) -> Optional[V1PersistentVolumeClaim]:
@@ -179,9 +206,14 @@ def listPodForAllNamespaces() -> V1PodList:
     return podList
 
 
-def isPodExist(podName):
-    podList = coreApi.list_namespaced_pod(field_selector=f'metadata.name={podName}', namespace="default")
+def isPodExist(port):
+    podList = coreApi.list_namespaced_pod(label_selector=f'app=oj-k8s-server,id={port}', namespace="default")
     return len(podList.items) == 1
+
+
+def isDeploymentExist(port):
+    deployments = appsApi.list_namespaced_deployment(field_selector=f'metadata.name=server-{port}', namespace="default")
+    return len(deployments) == 1
 
 
 def isPvcExist(pvcName):

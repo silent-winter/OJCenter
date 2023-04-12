@@ -34,7 +34,7 @@ def existPod(port):
 
 
 def savePod(pod):
-    if pod is None:
+    if pod is None or r.exists(_strPodMetaInfo + str(pod.port)):
         return
     r.hmset(_strPodMetaInfo + str(pod.port), {"port": pod.port, "pvPath": pod.pvPath, "clusterIp": pod.clusterIp})
     r.lpush(_strPodPortList, pod.port)
@@ -190,7 +190,7 @@ def removeUser(username):
             # 删除pod, pvc, pv
             pvcName = "pvc-" + targetPort
             name = "server-" + targetPort
-            k8sTool.deletePod(name)
+            k8sTool.deleteDeployment(name)
             r.delete(_strPodMetaInfo + targetPort)
             if not systemTool.isPermanentPort(int(targetPort)):
                 # 非常驻节点, 全部删除
@@ -205,7 +205,7 @@ def removeUser(username):
                 #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
                 # ), ())
                 # 线程池提交任务
-                executor.submit(autoCreatePermanentPod, name, targetPort, pvPath, clusterIp)
+                executor.submit(autoCreatePermanentPod, targetPort, pvPath, clusterIp)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
@@ -226,10 +226,10 @@ def removeUser(username):
 
 
 # 异步线程池创建pod
-def autoCreatePermanentPod(name, port, pvPath, clusterIp):
-    while k8sTool.isPodExist(name):
+def autoCreatePermanentPod(port, pvPath, clusterIp):
+    while k8sTool.isDeploymentExist(port):
         time.sleep(10)
-    k8sTool.createPod(port)
+    k8sTool.createDeployment(port)
     savePod(PodMetaInfo(port, pvPath, clusterIp))
 
 
