@@ -125,9 +125,14 @@ def createDeployment(port):
         print("Exception when calling AppsV1Api->create_namespaced_deployment: %s\n" % e)
 
 
-def deletePod(name) -> V1Pod:
+def deletePod(port):
+    pods = coreApi.list_namespaced_pod(label_selector=f'app=oj-k8s-server,id={port}', namespace="default")
+    if len(pods.items) == 0:
+        return
+    pod = pods.items[0]
+    podName = pod.to_dict()["metadata"]["name"]
     try:
-        return coreApi.delete_namespaced_pod(name, "default")
+        coreApi.delete_namespaced_pod(podName, "default")
     except ApiException as e:
         print("Exception when calling CoreV1Api->delete_namespaced_pod: %s\n" % e)
 

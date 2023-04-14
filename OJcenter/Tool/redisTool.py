@@ -190,22 +190,18 @@ def removeUser(username):
             # 删除pod, pvc, pv
             pvcName = "pvc-" + targetPort
             name = "server-" + targetPort
-            k8sTool.deleteDeployment(name)
             r.delete(_strPodMetaInfo + targetPort)
             if not systemTool.isPermanentPort(int(targetPort)):
                 # 非常驻节点, 全部删除
+                k8sTool.deleteDeployment(name)
                 k8sTool.deletePvc(pvcName)
                 os.system("rm -rf " + pvPath)
             else:
                 print("podName=%s is permanent pod, will recreate soon" % name)
+                k8sTool.deletePod(targetPort)
                 # 常驻节点, 重新创建
-                # _thread.start_new_thread(lambda: (
-                #     time.sleep(20),
-                #     k8sTool.createPod(name, targetPort, pvcName),
-                #     savePod(PodMetaInfo(k8sTool.getHostIp(name), targetPort, name, pvPath))
-                # ), ())
                 # 线程池提交任务
-                executor.submit(autoCreatePermanentPod, targetPort, pvPath, clusterIp)
+                # executor.submit(autoCreatePermanentPod, targetPort, pvPath, clusterIp)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
@@ -226,11 +222,11 @@ def removeUser(username):
 
 
 # 异步线程池创建pod
-def autoCreatePermanentPod(port, pvPath, clusterIp):
-    while k8sTool.isDeploymentExist(port):
-        time.sleep(10)
-    k8sTool.createDeployment(port)
-    savePod(PodMetaInfo(port, pvPath, clusterIp))
+# def autoCreatePermanentPod(port, pvPath, clusterIp):
+#     while k8sTool.isDeploymentExist(port):
+#         time.sleep(10)
+#     k8sTool.createDeployment(port)
+#     savePod(PodMetaInfo(port, pvPath, clusterIp))
 
 
 def checkToken():

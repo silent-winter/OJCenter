@@ -66,8 +66,5 @@ def test2():
 
 
 if __name__ == '__main__':
-    def getClusterIp(svcName):
-        svc = coreApi.read_namespaced_service(name=svcName, namespace="default")
-        return svc.spec.cluster_ip
-
-    print(getClusterIp("svc-30000"))
+    pods = coreApi.list_namespaced_pod(label_selector="app=oj-k8s-server,id=9100", namespace="default")
+    print(pods.items[0].to_dict()["metadata"]["name"])
