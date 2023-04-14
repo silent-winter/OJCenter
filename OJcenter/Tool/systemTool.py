@@ -1,8 +1,6 @@
 import _thread
-import configparser
 import os.path
 import socket
-import sys
 import threading
 import time
 
@@ -155,8 +153,15 @@ def refreshOrder():
     try:
         _thread.start_new_thread(cleanOccupied, ())
         _thread.start_new_thread(refreshDict, ())
+        _thread.start_new_thread(createPersistencePod, ())
     except:
         print("Error: 无法启动线程")
+
+
+def createPersistencePod():
+    while True:
+        initK8sPod()
+        time.sleep(60)
 
 
 def login(username, password):
@@ -264,18 +269,14 @@ def getPHPUserName(PHPSESSID):
 
 
 def checkLogin(request):
-    return request.headers.get("login-user")
-    # if platform.system() == 'Windows':
-    #     return "appmlk"
-    # elif(platform.system() == 'Linux'):
-    #     if "PHPSESSID" not in request.COOKIES:
-    #         return None
-    #     PHPSESSID = request.COOKIES["PHPSESSID"]
-    #     if PHPSESSID != None:
-    #         username = getPHPUserName(PHPSESSID)
-    #         return username
-    #     else:
-    #         return None
+    if "PHPSESSID" not in request.COOKIES:
+        return None
+    PHPSESSID = request.COOKIES["PHPSESSID"]
+    if PHPSESSID is not None:
+        username = getPHPUserName(PHPSESSID)
+        return username
+    else:
+        return None
 
 
 def checkContestVerify(targetUser):

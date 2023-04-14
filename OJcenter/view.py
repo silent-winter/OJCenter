@@ -27,7 +27,7 @@ def getUrl(request):
             faileddict = {"result": -100, "info": "未登录"}
             return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
-        res = {"result": 1,"url": "202.4.155.97"}
+        res = {"result": 1,"url": "/"}
         return HttpResponse(json.dumps(res), content_type="application/json")
     except Exception as re:
         faileddict = {"result": -1, "info": "异常错误"}
@@ -61,7 +61,7 @@ def getCookie(request):
 
 @csrf_exempt
 def getUsername(request):
-    return HttpResponse(json.dumps({"result": 1, "info": "appmlk"}), content_type="application/json")
+    return HttpResponse(json.dumps({"result": 1, "info": systemTool.checkLogin(request)}), content_type="application/json")
 
 
 @csrf_exempt
