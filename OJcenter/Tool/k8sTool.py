@@ -213,7 +213,7 @@ def isPodExist(port):
 
 def isDeploymentExist(port):
     deployments = appsApi.list_namespaced_deployment(field_selector=f'metadata.name=server-{port}', namespace="default")
-    return len(deployments) == 1
+    return len(deployments.items) == 1
 
 
 def isPvcExist(pvcName):
