@@ -32,8 +32,8 @@ urlpatterns = [
     # url(r'^permission', views.Permission),
     # url(r'^codeview', views.vscode),
     # url(r'^logout', views.logout),
-
-    url(r'^.*getcookie', view.getCookie),
+    url(r'^.*getcookiesimple', view.getAccessCodeServerSimple),
+    # url(r'^.*getcookie', view.getCookie),
     url(r'^.*insertuser', view.insertUser),
     url(r'^.*getorder', view.getOrder),
     url(r'^.*checkalive', view.checkAlive),
@@ -46,8 +46,11 @@ urlpatterns = [
     url(r'^.*editcode', view.getEditCode),
     url(r'^.*update', view.getEditCodeUpdate),
     # url(r'^entercontest', view.entercontest),
+    url(r'^.*getusername', view.getUsername),
     url(r'^.*onlinecount', view.onlinecount),
     url(r'^.*checkmessage', view.getMessage),
+    url(r'^.*getmodel', view.getModel),
+    url(r'^.*getlasturl', view.getUrl),
 
     url(r'^.*userlist', adminview.userlist),
     url(r'^.*usermonitor', adminview.usermonitor),

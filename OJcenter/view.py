@@ -19,6 +19,38 @@ cst_tz = timezone('Asia/Shanghai')
 utc_tz = timezone('UTC')
 
 
+@csrf_exempt
+def getUrl(request):
+    try:
+        username = systemTool.checkLogin(request)
+        if username==None:
+            faileddict = {"result": -100, "info": "未登录"}
+            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
+        res = {"result": 1,"url": "202.4.155.97"}
+        return HttpResponse(json.dumps(res), content_type="application/json")
+    except Exception as re:
+        faileddict = {"result": -1, "info": "异常错误"}
+        return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
+
+@csrf_exempt
+def getModel(request):
+    try:
+        username= systemTool.checkLogin(request)
+        if username==None:
+            faileddict = {"result": -100, "info": "未登录"}
+            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
+        model = 1
+        successdict = {"result": 1, "model": model}
+        return HttpResponse(json.dumps(successdict), content_type="application/json")
+    except Exception as e:
+        print(e)
+        faileddict = {"result": -1, "info": "异常错误"}
+        return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
+
 def getCookie(request):
     username = systemTool.checkLogin(request)
     if username == None:
@@ -27,7 +59,7 @@ def getCookie(request):
     result = {"result": 1, "info": redisTool.getPortToken(username)}
     return HttpResponse(json.dumps(result), content_type="application/json")
 
-
+@csrf_exempt
 def getUsername(request):
     return HttpResponse(json.dumps({"result": 1, "info": "appmlk"}), content_type="application/json")
 
@@ -534,6 +566,21 @@ def getAccessCodeServer(request):
     try:
         username = systemTool.checkLogin(request)
         if username is None:
+            faileddict = {"result": -100, "info": "未登录"}
+            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+        cookie = redisTool.getPortToken(username)
+        successdict = {"result": 1, "info": cookie}
+        return HttpResponse(json.dumps(successdict), content_type="application/json")
+    except Exception as e:
+        print("Exception in getAccessCodeServer: \n%s" % e)
+        faileddict = {"result": -1, "info": "异常错误"}
+        return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
+def getAccessCodeServerSimple(request):
+    try:
+        username = request.POST['username']
+        password = request.POST['password']
+        if password !="as055dSg54W6eA5423412":
             faileddict = {"result": -100, "info": "未登录"}
             return HttpResponse(json.dumps(faileddict), content_type="application/json")
         cookie = redisTool.getPortToken(username)
