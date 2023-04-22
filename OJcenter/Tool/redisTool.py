@@ -14,12 +14,11 @@ ex_time = 15 * 60
 # ex_time = 1 * 30
 all_time = 3 * 60 * 60
 # all_time = 5 * 60
-_strLoginUser = "loginUser:"
-_Str_User_to_Port = "UserPort"
-_Str_User_to_Token = "UserToken"
-_Str_Port_to_User = "PortUser"
-_Str_Port_Start_Time = "PortStartTime"
-_Str_User_File_Save_Mode = "FileSaveMode"
+_Str_User_to_Port = "UserPort:"
+_Str_User_to_Token = "UserToken:"
+_Str_Port_to_User = "PortUser:"
+_Str_Port_Start_Time = "PortStartTime:"
+_Str_User_File_Save_Mode = "FileSaveMode:"
 # 存储pod元信息
 _strPodMetaInfo = "pod:metaInfo:"
 _strPodPortList = "pod:portList"
@@ -190,18 +189,17 @@ def removeUser(username):
             # 删除pod, pvc, pv
             pvcName = "pvc-" + targetPort
             name = "server-" + targetPort
-            r.delete(_strPodMetaInfo + targetPort)
+            k8sTool.deleteDeployment(name)
             if not systemTool.isPermanentPort(int(targetPort)):
                 # 非常驻节点, 全部删除
-                k8sTool.deleteDeployment(name)
+                r.delete(_strPodMetaInfo + targetPort)
                 k8sTool.deletePvc(pvcName)
                 os.system("rm -rf " + pvPath)
             else:
-                print("podName=%s is permanent pod, will recreate soon" % name)
-                k8sTool.deletePod(targetPort)
                 # 常驻节点, 重新创建
+                print("deployment=%s is permanent, will recreate soon" % name)
                 # 线程池提交任务
-                # executor.submit(autoCreatePermanentPod, targetPort, pvPath, clusterIp)
+                executor.submit(autoCreatePermanentPod, targetPort)
 
             if r.exists(targetToken):
                 r.delete(targetToken)
@@ -222,11 +220,11 @@ def removeUser(username):
 
 
 # 异步线程池创建pod
-# def autoCreatePermanentPod(port, pvPath, clusterIp):
-#     while k8sTool.isDeploymentExist(port):
-#         time.sleep(10)
-#     k8sTool.createDeployment(port)
-#     savePod(PodMetaInfo(port, pvPath, clusterIp))
+def autoCreatePermanentPod(port):
+    while k8sTool.isDeploymentExist(port):
+        time.sleep(5)
+    k8sTool.createDeployment(port)
+    r.lpush(_strPodPortList, port)
 
 
 def checkToken():
@@ -268,7 +266,7 @@ def getPort(username):
     if r.exists(_Str_User_to_Token + username):
         targetToken = r.get(_Str_User_to_Token + username)
         if r.exists(targetToken):
-            return r.get(targetToken)
+            return r.hget(targetToken, "port")
         else:
             return None
     else:

@@ -304,6 +304,15 @@ def getUseTime(request):
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(',')[-1].strip()
+    elif request.META.get('HTTP_X_REAL_IP'):
+        ip = request.META.get('HTTP_X_REAL_IP')
+    else:
+        ip = request.META.get('REMOTE_ADDR')
+    return ip
 
 def getSubmitAnswer(request):
     try:
@@ -314,15 +323,14 @@ def getSubmitAnswer(request):
         json_result = json.loads(postBody)
         username = json_result['username']
         """
-        username = systemTool.checkLogin(request)
-        if username == None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
         language = request.POST["language"]
         id = int(request.POST["id"])
         cid = int(request.POST["cid"])
         pid = int(request.POST["pid"])
+        # ip=get_client_ip(request)
+        ip = str(request.POST["ip"])
+        password = str(request.POST["password"])
+        username = str(request.POST["username"])
 
         languageint = 0
         if language == "cpp":
@@ -341,21 +349,23 @@ def getSubmitAnswer(request):
         url = 'http://127.0.0.1:2336/vsbuctojsubmit.php'
         if cid == 0:
             d = {"user_id": username,
-                 "password": "",
+                 "password": "ASisends926002hspsJis9eIesk",
                  "language": languageint,
                  "source": source,
                  "VSmode": 1,
+                 "ip": ip,
                  "id": id}
         else:
             d = {"user_id": username,
-                 "password": "",
+                 "password": "ASisends926002hspsJis9eIesk",
                  "language": languageint,
                  "source": source,
                  "VSmode": "1",
                  "cid": cid,
+                 "ip": ip,
                  "pid": pid}
         r = requests.post(url, data=d)
-
+        print(d)
         successdict = {"code": 1, "msg": "成功"}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:

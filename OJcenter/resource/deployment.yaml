@@ -59,8 +59,10 @@ spec:
               mountPath: "/config/workspace"
           resources:
             limits:
+              cpu: "500m"
               memory: "512Mi"
             requests:
+              cpu: "200m"
               memory: "300Mi"
       volumes:
         - name: shared-workspace

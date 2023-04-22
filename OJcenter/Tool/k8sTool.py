@@ -7,7 +7,7 @@ import urllib3
 from retry import retry
 
 from kubernetes import client
-from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim, V1Service
+from kubernetes.client import V1Pod, V1PodList, V1PersistentVolumeClaim
 from kubernetes.client.rest import ApiException
 
 from OJcenter import context
@@ -74,14 +74,16 @@ def create(port) -> Optional[PodMetaInfo]:
     pvcName = "pvc-%s" % port
     svcName = "svc-%s" % port
     createPvc(pvcName)
-    createDeployment(port)
+    dep = createDeployment(port)
+    if dep is None:
+        return None
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
     # os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
-    print("create pod success, port=%s, pvPath=%s" % (port, pvPath))
+    print("create deployment finish, port=%s, pvPath=%s" % (port, pvPath))
     return PodMetaInfo(port, pvPath, getClusterIp(svcName))
 
 
@@ -105,7 +107,7 @@ def createPod(port) -> V1Pod:
     return pod
 
 
-def createDeployment(port):
+def createDeployment(port) -> Optional[client.V1Deployment]:
     nodes = context.getAllKeys("node-config")
     # 设置节点亲和性
     affinity = ','.join(
@@ -116,13 +118,14 @@ def createDeployment(port):
             for node in nodes
         ]
     )
-    bodyStr = '{{"apiVersion":"apps/v1","kind":"Deployment","metadata":{{"name":"server-%s","labels":{{"app":"oj-k8s-deployment"}}}},"spec":{{"replicas":1,"selector":{{"matchLabels":{{"app":"oj-k8s-server","id":"%s"}}}},"template":{{"metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi"}},"requests":{{"memory":"300Mi"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}}}}}'.format(
+    bodyStr = '{{"apiVersion":"apps/v1","kind":"Deployment","metadata":{{"name":"server-%s","labels":{{"app":"oj-k8s-deployment"}}}},"spec":{{"replicas":1,"selector":{{"matchLabels":{{"app":"oj-k8s-server","id":"%s"}}}},"template":{{"metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi","cpu":"500m"}},"requests":{{"memory":"300Mi","cpu":"200m"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}}}}}'.format(
         affinity) % (port, port, port, port, port)
     body = eval(bodyStr)
     try:
-        appsApi.create_namespaced_deployment(body=body, namespace="default")
+        return appsApi.create_namespaced_deployment(body=body, namespace="default")
     except ApiException as e:
         print("Exception when calling AppsV1Api->create_namespaced_deployment: %s\n" % e)
+        return None
 
 
 def deletePod(port):
@@ -247,6 +250,9 @@ def copyPermanentFolder(username, pvPath):
     code = aesTool.getEncrypt(username + ' ' + currTime)
     with open(file=authFile, mode="w") as f:
         f.write(code.decode())
+    # 等待容器创建
+    while not os.path.exists(pvPath + "/.vscode"):
+        time.sleep(0.1)
     shutil.copyfile(authFile, pvPath + "/.vscode/authorization")
 
 

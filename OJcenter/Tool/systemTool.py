@@ -153,7 +153,7 @@ def refreshOrder():
     try:
         _thread.start_new_thread(cleanOccupied, ())
         _thread.start_new_thread(refreshDict, ())
-        _thread.start_new_thread(createPersistencePod, ())
+        # _thread.start_new_thread(createPersistencePod, ())
     except:
         print("Error: 无法启动线程")
 
