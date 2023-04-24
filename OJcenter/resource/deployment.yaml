@@ -1,38 +1,38 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: server-%s
+  name: server-10000
   labels:
     app: oj-k8s-deployment
 spec:
-  replicas: 1
-  selector:
+  replicas: 1     # 每个pod的副本数（总共）
+  selector:   # 匹配Deployment管理的pod标签
     matchLabels:
       app: oj-k8s-server
-      id: %s
-  template:
+      id: "10000"
+  template:   # pod的模板
     metadata:
       namespace: default
       name: server-%s
       labels:
         app: oj-k8s-server
-        id: "%s"
+        id: "10000"
     spec:
-      affinity:
+      affinity:   # 管理节点的pod数量上限，参考文档：https://blog.csdn.net/cui_song_lin/article/details/123588392
         nodeAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:
             - preference:
                 matchExpressions:
                   - key: node2/vscode-limit
                     operator: Gt
-                    values: ["%s"]
-              weight: %s
+                    values: ["0"]
+              weight: 4
             - preference:
                 matchExpressions:
                   - key: node3/vscode-limit
                     operator: Gt
-                    values: ["%s"]
-              weight: %s
+                    values: ["0"]
+              weight: 5
       initContainers:
         - name: init-server
           image: server_20230323:latest
@@ -62,7 +62,7 @@ spec:
               cpu: "500m"
               memory: "512Mi"
             requests:
-              cpu: "200m"
+              cpu: "30m"
               memory: "300Mi"
       volumes:
         - name: shared-workspace

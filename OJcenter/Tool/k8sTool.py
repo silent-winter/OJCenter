@@ -12,7 +12,7 @@ from kubernetes.client.rest import ApiException
 
 from OJcenter import context
 from OJcenter.Tool import aesTool, timeTool, redisTool
-from OJcenter.model import PodMetaInfo
+from OJcenter.Tool.model import PodMetaInfo
 
 # 获取apiserver token
 # kubectl -n kubernetes-dashboard get secret $(kubectl -n kubernetes-dashboard get sa/admin-user -o jsonpath="{.secrets[0].name}") -o go-template="{{.data.token | base64decode}}"
@@ -74,16 +74,14 @@ def create(port) -> Optional[PodMetaInfo]:
     pvcName = "pvc-%s" % port
     svcName = "svc-%s" % port
     createPvc(pvcName)
-    dep = createDeployment(port)
-    if dep is None:
-        return None
+    createDeployment(port)
     pvName = getPvName(pvcName)
     # 初始化文件
     pvPath = "/nfs/data/default-%s-%s" % (pvcName, pvName)
     # os.system("cp -rp /nfs/data/base/test/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/answer/  %s/" % pvPath)
     # os.system("cp -rp /nfs/data/base/.vscode/  %s/" % pvPath)
-    print("create deployment finish, port=%s, pvPath=%s" % (port, pvPath))
+    print("deployment=server-%s, port=%s, pvPath=%s" % (port, port, pvPath))
     return PodMetaInfo(port, pvPath, getClusterIp(svcName))
 
 
@@ -108,6 +106,8 @@ def createPod(port) -> V1Pod:
 
 
 def createDeployment(port) -> Optional[client.V1Deployment]:
+    if isDeploymentExist(port):
+        return None
     nodes = context.getAllKeys("node-config")
     # 设置节点亲和性
     affinity = ','.join(
@@ -118,7 +118,7 @@ def createDeployment(port) -> Optional[client.V1Deployment]:
             for node in nodes
         ]
     )
-    bodyStr = '{{"apiVersion":"apps/v1","kind":"Deployment","metadata":{{"name":"server-%s","labels":{{"app":"oj-k8s-deployment"}}}},"spec":{{"replicas":1,"selector":{{"matchLabels":{{"app":"oj-k8s-server","id":"%s"}}}},"template":{{"metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi","cpu":"500m"}},"requests":{{"memory":"300Mi","cpu":"200m"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}}}}}'.format(
+    bodyStr = '{{"apiVersion":"apps/v1","kind":"Deployment","metadata":{{"name":"server-%s","labels":{{"app":"oj-k8s-deployment"}}}},"spec":{{"replicas":1,"selector":{{"matchLabels":{{"app":"oj-k8s-server","id":"%s"}}}},"template":{{"metadata":{{"namespace":"default","name":"server-%s","labels":{{"app":"oj-k8s-server","id":"%s"}}}},"spec":{{"affinity":{{"nodeAffinity":{{"preferredDuringSchedulingIgnoredDuringExecution":[{}]}}}},"initContainers":[{{"name":"init-server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","command":["/bin/sh","-c","cp -R /config/workspace/. /mnt"],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}}]}}],"containers":[{{"name":"server","image":"server_20230323:latest","imagePullPolicy":"IfNotPresent","lifecycle":{{"postStart":{{"exec":{{"command":["/bin/sh","-c","cp -R /mnt/. /config/workspace"]}}}}}},"ports":[{{"name":"vscode","containerPort":8443}}],"volumeMounts":[{{"name":"shared-workspace","mountPath":"/mnt"}},{{"name":"workspace-volume","mountPath":"/config/workspace"}}],"resources":{{"limits":{{"memory":"512Mi","cpu":"500m"}},"requests":{{"memory":"300Mi","cpu":"30m"}}}}}}],"volumes":[{{"name":"shared-workspace","emptyDir":{{}}}},{{"name":"workspace-volume","persistentVolumeClaim":{{"claimName":"pvc-%s"}}}}]}}}}}}}}'.format(
         affinity) % (port, port, port, port, port)
     body = eval(bodyStr)
     try:

@@ -12,13 +12,3 @@ class UserstatusDetail(models.Model):
     class Meta:
         managed = False
         db_table = 'userstatus_detail'
-
-
-class PodMetaInfo:
-    def __init__(self, port, pvPath, clusterIp):
-        self.port = port
-        self.pvPath = pvPath
-        self.clusterIp = clusterIp
-
-    def __repr__(self):
-        return "port=%s, pvPath=%s, clusterIp=%s" % (self.port, self.pvPath, self.clusterIp)
