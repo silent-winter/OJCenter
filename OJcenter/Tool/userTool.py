@@ -1,13 +1,38 @@
 import configparser
+import logging
 import sys
-
-import os
-
 import datetime
+
 import MySQLdb
 import pandas
 import pandas as pd
-from OJcenter.Tool import dockerTool, redisTool
+from asgiref.sync import async_to_sync, sync_to_async
+from channels.layers import get_channel_layer
+from django.core.cache import cache
+from django.utils import timezone
+
+from OJcenter.Tool import redisTool
+from OJcenter.model import UserstatusDetail
+
+
+@sync_to_async
+def is_lock(username):
+    return UserstatusDetail.objects.filter(username=username, is_lock=1, is_unlock=0).count() > 0
+
+
+@sync_to_async
+def get_unlock_time(username):
+    cache_key = f"get_unlock_time:{username}"
+    value = cache.get(cache_key)
+    if value is not None:
+        return value
+    user_status_detail = UserstatusDetail.objects.filter(username=username, is_lock=1, is_unlock=0).order_by('-id').first()
+    if user_status_detail:
+        auto_unlock_time = user_status_detail.autounlock_time
+        if auto_unlock_time:
+            cache.set(cache_key, auto_unlock_time)
+            return auto_unlock_time
+    return None
 
 
 def codeCheck(detail):
@@ -21,22 +46,42 @@ def codeCheck(detail):
 
 def ban(username, status, detail):
     try:
-        curr_time = datetime.datetime.now()
-        time_str = datetime.datetime.strftime(curr_time, '%Y-%m-%d %H:%M:%S')
-        db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
-        cursor = db.cursor()
-        query = """insert into userstatus_detail (username, contest_id, problem_id,
-        status, pastetime, paste_label, detail, is_lock, is_unlock, updatetime) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
-        values = (
-            username, "no", "no", status, time_str, "0", detail, "1", "0", time_str)
-        cursor.execute(query, values)
-        db.commit()
-        db.close()
-        targetPort = redisTool.getPort(username)
-        command = "docker pause " + "ojDockerServer" + str(targetPort)
-        os.system(command)
+        curr_time = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+        # db = MySQLdb.connect("localhost", "debian-sys-maint", "DOZtOQzgvY1oFXb1", "record", charset='utf8')
+        # cursor = db.cursor()
+        # query = """insert into userstatus_detail (username, contest_id, problem_id,
+        # status, pastetime, paste_label, detail, is_lock, is_unlock, updatetime) values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"""
+        # values = (
+        #     username, "no", "no", status, time_str, "0", detail, "1", "0", time_str)
+        # cursor.execute(query, values)
+        # db.commit()
+        # db.close()
+        user_status_detail = UserstatusDetail(username=username, contest_id="no", problem_id="no", status=status,
+                                              pastetime=curr_time, paste_label="0", detail=detail, is_lock="1",
+                                              is_unlock="0", updatetime=curr_time, autounlock_time="2023-06-10 23:00:00")
+        user_status_detail.save()
+        # port = redisTool.getPort(username)
+        # command = "docker pause " + "ojDockerServer" + str(targetPort)
+        # os.system(command)
+        # 这里需要修改为: websocket通知前端, 展示封号弹窗, 并退回首页
+        send_message(username)
+        redisTool.removeUser(username)
     except Exception as re:
-        print(re)
+        logging.error("Exception in ban user: %s", re)
+
+
+@async_to_sync
+async def send_message(username):
+    channel_layer = get_channel_layer()
+    group_name = 'user_' + username
+    await channel_layer.group_send(group_name, {
+        'type': 'send_notice_message',
+        'message': {'type': 'check-status', 'body': {'result': 'ban'}}
+    })
+
+
+def testBan(username, status, detail):
+    ban(username, status, detail)
 
 
 def updateUserStatus(username, status, detail):

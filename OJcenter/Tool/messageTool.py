@@ -3,6 +3,41 @@ import platform
 
 import MySQLdb
 import pandas as pd
+from asgiref.sync import sync_to_async
+from django.db import close_old_connections
+from django.db.models import Q
+from django.utils import timezone
+
+from OJcenter.model import Notification, Notificationget
+
+
+@sync_to_async
+def query_message_new(username):
+    # 清理失效的连接
+    close_old_connections()
+    curr_time = timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    notifications = Notification.objects.using('jol').filter(
+        (Q(targetuser=username) | Q(targetuser='') | Q(targetuser__isnull=True))
+        & (Q(platform='all') | Q(platform='vscode'))
+        & (Q(deadline__gt=curr_time) | Q(deadline='')),
+    ).only('id', 'content')
+    for notification in notifications:
+        notification_get = Notificationget.objects.using('jol').filter(username=username, notificationid=notification.id).first()
+        if notification_get is not None:
+            continue
+        else:
+            save_message_read_log(username, notification.id)
+            return notification.content
+    return None
+
+
+@sync_to_async
+def save_message_read_log(username, notification_id):
+    Notificationget.objects.using('jol').create(
+        username=username,
+        notificationid=notification_id,
+        updatetime=timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    )
 
 
 def queryMessage(username):

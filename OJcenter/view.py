@@ -1,7 +1,7 @@
 # coding=utf-8
 from __future__ import division
 
-import base64
+import logging
 import os
 
 import time
@@ -9,24 +9,59 @@ import time
 import json
 import requests
 import urllib
+
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from pytz import timezone
-from OJcenter.Tool import systemTool, dockerTool, userTool, messageTool, RSAdecode, aesTool, k8sTool, redisTool
+from OJcenter.Tool import systemTool, dockerTool, userTool, aesTool, k8sTool, redisTool
 from .model import UserstatusDetail
 
 cst_tz = timezone('Asia/Shanghai')
 utc_tz = timezone('UTC')
 
 
+def lockStatus(request):
+    username = request.username
+    if userTool.get_unlock_time(username):
+        return HttpResponse(json.dumps({'result': 1}), content_type="application/json")
+    return HttpResponse(json.dumps({'result': -1}), content_type="application/json")
+
+
+def handleNotice(request):
+    body_unicode = request.body.decode('utf-8')
+    data = json.loads(body_unicode)
+    notification_ids = data['notification_ids']
+    users = data['users']
+    content = data['content']
+    logging.info("notice body [content={}, users=[{}], notification_ids=[{}]]".format(
+        content,
+        ', '.join(users),
+        ', '.join(notification_ids))
+    )
+    send_message(users, notification_ids, {"type": "notice", "body": {"id": -1, "message": content}})
+    return HttpResponse("ok")
+
+
+@async_to_sync
+async def send_message(users, notification_ids, message):
+    channel_layer = get_channel_layer()
+    for i in range(len(users)):
+        group_name = 'user_' + users[i]
+        message['body']['id'] = notification_ids[i]
+        await channel_layer.group_send(
+            group_name,
+            {
+                'type': 'send_notice_message',
+                'message': message
+            },
+        )
+
 @csrf_exempt
 def getUrl(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username==None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         res = {"result": 1,"url": "/"}
         return HttpResponse(json.dumps(res), content_type="application/json")
     except Exception as re:
@@ -37,11 +72,7 @@ def getUrl(request):
 @csrf_exempt
 def getModel(request):
     try:
-        username= systemTool.checkLogin(request)
-        if username==None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         model = 1
         successdict = {"result": 1, "model": model}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
@@ -61,24 +92,13 @@ def getCookie(request):
 
 @csrf_exempt
 def getUsername(request):
-    return HttpResponse(json.dumps({"result": 1, "info": systemTool.checkLogin(request)}), content_type="application/json")
+    return HttpResponse(json.dumps({"result": 1, "info": request.username}), content_type="application/json")
 
 
 @csrf_exempt
 def insertUser(request):
     try:
-        # 修改username获取方式
-        """
-        print(request.method)
-        postBody = request.body
-        json_result = json.loads(postBody)
-        username = json_result['username']
-        """
-        username = systemTool.checkLogin(request)
-        if username == None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         status = redisTool.insertUser(username)
         successdict = {"result": 1, "info": status}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
@@ -90,11 +110,7 @@ def insertUser(request):
 
 def orderResult(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username == None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return faileddict
-
+        username = request.username
         targetToken = redisTool.queryUser(username)
         # templeMessage=messageTool.queryMessage(username)
         templeMessage = None
@@ -113,7 +129,7 @@ def orderResult(request):
 
 def lockResult(request):
     try:
-        username = systemTool.checkLogin(request)
+        username = request.username
         request.GET.get("cid")
         if username != None and UserstatusDetail.objects.filter(username=username, is_lock=1, is_unlock=0).count() > 0:
             targetPort = redisTool.getPort(username)
@@ -167,18 +183,7 @@ def checkAlive(request):
 @csrf_exempt
 def removeUser(request):
     try:
-        # 修改username获取方式
-        """
-                print(request.method)
-                postBody = request.body
-                json_result = json.loads(postBody)
-                username = json_result['username']
-                """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         redisTool.removeUser(username)
 
         successdict = {"result": 1}
@@ -234,19 +239,7 @@ def init():
 @csrf_exempt
 def getUserPort(request):
     try:
-        # 修改username获取方式
-
-        """
-                print(request.method)
-                postBody = request.body
-                json_result = json.loads(postBody)
-                username = json_result['username']
-                """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         port = redisTool.getPort(username)
 
         successdict = {"result": 1, "port": port}
@@ -259,19 +252,7 @@ def getUserPort(request):
 
 def getUserToken(request):
     try:
-        # 修改username获取方式
-
-        """
-                print(request.method)
-                postBody = request.body
-                json_result = json.loads(postBody)
-                username = json_result['username']
-                """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         portToken = redisTool.getPortToken(username)
 
         successdict = {"result": 1, "token": portToken}
@@ -284,17 +265,7 @@ def getUserToken(request):
 
 def getUseTime(request):
     try:
-        """
-                print(request.method)
-                postBody = request.body
-                json_result = json.loads(postBody)
-                username = json_result['username']
-                """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         startTime, useTime = redisTool.getUseTime(username)
 
         successdict = {"result": 1, "starttime": startTime, "usetime": useTime}
@@ -376,18 +347,7 @@ def getSubmitAnswer(request):
 
 def getEditCode(request):
     try:
-        # 修改username获取方式
-        """
-        print(request.method)
-        postBody = request.body
-        json_result = json.loads(postBody)
-        username = json_result['username']
-        """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         id = request.POST["p3"]
 
         url = 'http://127.0.0.1:2336/showsource3.php?id=' + id + '&username=' + username + '&password=ASiend92600spJi9eIesk'
@@ -431,17 +391,7 @@ def getEditCode(request):
 
 def getMessage(request):
     try:
-        """
-                print(request.method)
-                postBody = request.body
-                json_result = json.loads(postBody)
-                username = json_result['username']
-                """
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         startTime, useTime = redisTool.getUseTime(username)
 
         successdict = {"result": 1, "starttime": startTime, "usetime": useTime}
@@ -454,14 +404,10 @@ def getMessage(request):
 
 def checkStatus(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
-
+        username = request.username
         status = request.POST["status"]
         detail = request.POST["detail"]
-        userTool.updateUserStatus(username, status, detail)
+        userTool.testBan(username, status, detail)
 
         successdict = {"result": 1}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
@@ -539,10 +485,7 @@ def getEditCodeUpdate(request):
 
 def entercontest(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+        username = request.username
         contestid = request.POST["contest"]
         status = systemTool.entercontest(username, contestid)
         if status == 1:
@@ -559,10 +502,7 @@ def entercontest(request):
 
 def onlinecount(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username == None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+        username = request.username
         count = redisTool.countUser()
         successdict = {"result": 1, "info": count}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
@@ -574,10 +514,7 @@ def onlinecount(request):
 
 def getAccessCodeServer(request):
     try:
-        username = systemTool.checkLogin(request)
-        if username is None:
-            faileddict = {"result": -100, "info": "未登录"}
-            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+        username = request.username
         cookie = redisTool.getPortToken(username)
         successdict = {"result": 1, "info": cookie}
         return HttpResponse(json.dumps(successdict), content_type="application/json")

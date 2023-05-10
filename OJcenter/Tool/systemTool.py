@@ -1,4 +1,5 @@
 import _thread
+import logging
 import os.path
 import socket
 import threading
@@ -199,7 +200,7 @@ def login(username, password):
 # 根据配置文件初始化pod
 def initK8sPod():
     result = k8sTool.init(_startPort, _endPort)
-    print(result)
+    logging.info("pods = {} created".format(result))
     for pod in result:
         redisTool.savePod(pod)
 

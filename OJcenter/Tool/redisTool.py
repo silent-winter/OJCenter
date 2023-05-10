@@ -1,14 +1,15 @@
+import logging
 import os
-import platform
 import threading
-import _thread
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import redis  # 导入redis 模块
-from OJcenter.Tool import dockerTool, systemTool, permanentTool, k8sTool
-from OJcenter.Tool.model import PodMetaInfo
+
+from OJcenter import context
+from OJcenter.Tool import systemTool, permanentTool, k8sTool
+from OJcenter.Tool.k8sTool import PodMetaInfo
 
 ex_time = 15 * 60
 # ex_time = 1 * 30
@@ -23,9 +24,9 @@ _Str_User_File_Save_Mode = "FileSaveMode:"
 _strPodMetaInfo = "pod:metaInfo:"
 _strPodPortList = "pod:portList"
 
-pool = redis.ConnectionPool(host='localhost', port=6379, decode_responses=True)
+pool = redis.ConnectionPool(host=context.getHost(), port=6379, decode_responses=True)
 r = redis.Redis(connection_pool=pool)
-executor = ThreadPoolExecutor(max_workers=10)
+executor = context.executor()
 
 
 def existPod(port):
@@ -78,12 +79,12 @@ def insertUser(username):
         return "本系统当前被用于考试/比赛，而您未被邀请参加，因此暂时无法使用本系统。如有疑问请联系考试/比赛组织者"
 
     if r.exists(_Str_User_to_Port + username):
-        print(username, "已在使用docker")
+        logging.warning(username + "已在使用docker")
         return "已经在使用了，不能排队"
     if r.exists('vsUserList'):
         userList = r.lrange('vsUserList', 0, -1)
         if username in userList:
-            print(username, "已存在")
+            logging.warning(username + "已存在")
             return "已经在队列中了"
         else:
             r.lpush('vsUserList', username)
@@ -117,7 +118,7 @@ def popUser():
 
             # targetPort=dockerTool.createContainer()
             podInfo = getPod()
-            print(podInfo)
+            logging.info("get pod: [{}]".format(podInfo))
             targetPort, pvPath, clusterIp = podInfo.port, podInfo.pvPath, podInfo.clusterIp
             if targetPort == -1:
                 return -1, -1
@@ -197,7 +198,7 @@ def removeUser(username):
                 os.system("rm -rf " + pvPath)
             else:
                 # 常驻节点, 重新创建
-                print("deployment=%s is permanent, will recreate soon" % name)
+                logging.info("deployment=%s is permanent, will recreate soon" % name)
                 # 线程池提交任务
                 executor.submit(autoCreatePermanentPod, targetPort)
 
@@ -214,7 +215,7 @@ def removeUser(username):
             if length > 0:
                 r.lrem('vsUserList', 1, username)
     except Exception as re:
-        print(re)
+        logging.error(re)
     removeUserMutex.release()
     return 1
 
@@ -250,7 +251,7 @@ def checkToken():
             else:
                 _new_occupiedPort.append(targetPort)
         else:
-            print(str(targetPort), "不存在")
+            logging.error(str(targetPort) + "不存在")
     return _new_occupiedPort
 
 
@@ -327,11 +328,7 @@ def collectUser():
 
 
 def countUser():
-    count = 0
-    for key in r.scan_iter("*"):
-        if str(key).startswith(_Str_User_to_Port):
-            count += 1
-    return count
+    return len(r.keys('UserToken:*'))
 
 
 def getPortList():

@@ -1,0 +1,33 @@
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: kill-high-cpu-pod
+spec:
+  schedule: "* * * * *"
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          name: kill-high-cpu-pod
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: cronjob-user
+          containers:
+          - name: kubectl
+            image: bitnami/kubectl
+            imagePullPolicy: IfNotPresent
+            command:
+            - /bin/bash
+            - -c
+            - |-
+              running_pods=$(kubectl get pods --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}')
+              
+              for pod_name in $running_pods; do
+                cpu_usage=$(kubectl top pod "$pod_name" | awk '{print $2}' | tail -n 1 | awk '{print substr($1, 1, length($1)-1)}')
+              
+                if [[ $cpu_usage -gt 380 ]]; then
+                   kubectl delete pod "$pod_name"
+                fi
+              done

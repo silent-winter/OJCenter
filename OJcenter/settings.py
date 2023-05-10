@@ -9,7 +9,8 @@ https://docs.djangoproject.com/en/3.1/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.1/ref/settings/
 """
-
+import datetime
+import os
 from pathlib import Path
 
 import django
@@ -38,6 +39,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'k8s_admin',
+    'channels'
 ]
 
 MIDDLEWARE = [
@@ -48,7 +51,32 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'OJcenter.middleware.LoginMiddleware'
 ]
+
+# 日志
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {"require_debug_false": {"()": "django.utils.log.RequireDebugFalse"}},
+    "formatters": {  # 定义了两种日志格式
+        "verbose": {  # 标准
+            "format": "%(levelname)s %(asctime)s %(module)s "
+                      "%(process)d %(thread)d %(message)s"
+        },
+        'simple': {  # 简单
+            'format': '[%(levelname)s][%(asctime)s][%(filename)s] %(message)s'
+        },
+    },
+    "handlers": {
+        "console": {  # 打印到终端console
+            "level": "DEBUG",
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+    },
+    "root": {"level": "INFO", "handlers": ["console"]},
+}
 
 ROOT_URLCONF = 'OJcenter.urls'
 
@@ -68,10 +96,17 @@ TEMPLATES = [
     },
 ]
 
+ASGI_APPLICATION = 'OJcenter.asgi.application'
 WSGI_APPLICATION = 'OJcenter.wsgi.application'
 # sessionSetting
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 SESSION_SAVE_EVERY_REQUEST = True
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels.layers.InMemoryChannelLayer'
+    }
+}
 
 # Database
 # https://docs.djangoproject.com/en/3.1/ref/settings/#databases
@@ -80,19 +115,31 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'record',
-        'USER': 'debian-sys-maint',
-        'PASSWORD': 'DOZtOQzgvY1oFXb1',
+        'USER': 'root',
+        'PASSWORD': '123456',
+        'HOST': 'localhost',
+        'PORT': '3306',
+    },
+    'jol': {
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'jol',
+        'USER': 'root',
+        'PASSWORD': '123456',
         'HOST': 'localhost',
         'PORT': '3306',
     }
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.mysql',
-    #     'NAME': 'record',
-    #     'USER': 'root',
-    #     'PASSWORD': 'XinZi123',
-    #     'HOST': 'rm-bp1u0xeo485g955w7so.mysql.rds.aliyuncs.com',
-    #     'PORT': '3306',
-    # }
+}
+
+# 本地缓存
+CACHES = {
+  'default': {
+    'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    'LOCATION': 'unique-snowflake',
+    'TIMEOUT': 3600,  # 缓存过期时间，以秒为单位
+    'OPTIONS': {
+      'MAX_ENTRIES': 1000,  # 最大缓存条目数
+    }
+  }
 }
 
 # Password validation
@@ -124,7 +171,7 @@ USE_I18N = True
 
 USE_L10N = True
 
-USE_TZ = True
+USE_TZ = False
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.1/howto/static-files/

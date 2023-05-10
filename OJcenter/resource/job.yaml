@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kill-high-cpu-pods
+  labels:
+    app: oj-k8s-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-killer
+  template:
+    metadata:
+      labels:
+        app: pod-killer
+    spec:
+      serviceAccountName: cronjob-user
+      containers:
+        - name: kubectl
+          image: bitnami/kubectl
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/bash
+            - -c
+            - |-
+              declare -A POD_CPU_VIOLATION_COUNTER
+              while true; do
+                running_pods=$(kubectl get pods --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}')
+                for pod_name in $running_pods; do
+                  cpu_usage=$(kubectl top pod "$pod_name" | awk '{print $2}' | tail -n 1 | awk '{print substr($1, 1, length($1)-1)}')
+                  if [[ $cpu_usage -gt 380 ]]; then
+                    if [[ -z ${POD_CPU_VIOLATION_COUNTER["$pod_name"]} ]]; then
+                      POD_CPU_VIOLATION_COUNTER["$pod_name"]=1
+                    else
+                      POD_CPU_VIOLATION_COUNTER["$pod_name"]=$((POD_CPU_VIOLATION_COUNTER["$pod_name"]+1))
+                    fi
+                    echo "Pod $pod_name has exceeded its CPU limit ${POD_CPU_VIOLATION_COUNTER["$pod_name"]} times." >> /var/log/task.log
+                    if [[ ${POD_CPU_VIOLATION_COUNTER["$pod_name"]} -ge 2 ]]; then
+                      echo "Killing Pod $pod_name due to repeated CPU violations." >> /var/log/task.log
+                      kubectl delete pod "$pod_name"
+                      unset POD_CPU_VIOLATION_COUNTER["$pod_name"]
+                    fi
+                  else
+                    unset POD_CPU_VIOLATION_COUNTER["$pod_name"]
+                  fi
+                done
+                sleep 30s;
+              done
+          volumeMounts:
+            - name: log-volume
+              mountPath: /var/log
+      volumes:
+        - name: log-volume
+          emptyDir: {}
