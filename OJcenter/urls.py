@@ -53,7 +53,8 @@ urlpatterns = [
     url(r'^getmodel', view.getModel),
     url(r'^getlasturl', view.getUrl),
     url(r'^notice', view.handleNotice),
-    path(r'lockstatus', view.lockStatus),
+    url(r'^lockstatus', view.lockStatus),
+    url(r'^close', view.close_ws),
 
     path('userlist', adminview.userlist),
     path('usermonitor', adminview.usermonitor),

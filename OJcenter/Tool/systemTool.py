@@ -5,11 +5,17 @@ import socket
 import threading
 import time
 
+import phpserialize
+import redis
+
 import json
 import requests
 
 from OJcenter import context
-from OJcenter.Tool import redisTool, permanentTool, dockerTool, k8sTool
+from OJcenter.Tool import redisTool, permanentTool, dockerTool, k8sTool, userTool, messageTool
+
+from channels.layers import get_channel_layer
+from channels.exceptions import ChannelFull
 
 create_wait_times = 20
 _orderDict = {}
@@ -21,7 +27,6 @@ _startPort = int(context.getConfigValue("portconfig", "startport"))
 _endPort = int(context.getConfigValue("portconfig", "endport"))
 _maxUser = int(context.getConfigValue("portconfig", "maxuser"))
 _maxNum = int(context.getConfigValue("portconfig", "maxNum"))
-
 
 def _init():
     pass
@@ -254,6 +259,10 @@ def waitUntilFinished(targetPort):
 #             print(e)
 #         time.sleep(1)
 
+def get_session_id(request):
+    if "PHPSESSID" not in request.COOKIES:
+        return None
+    return request.COOKIES["PHPSESSID"]
 
 def getPHPUserName(PHPSESSID):
     sessionPath = os.path.join("/var/lib/php/sessions/", "sess_" + PHPSESSID)
@@ -268,6 +277,19 @@ def getPHPUserName(PHPSESSID):
         return None
     else:
         return None
+
+def is_admin(session_id):
+    session_file = os.path.join("/var/lib/php/sessions/", "sess_" + session_id)
+    if os.path.exists(session_file):
+        with open(session_file) as f:
+            content = f.read()
+        content_list = content.split(";")
+        for item in content_list:
+            if item.startswith("BUCTOJ_administrator"):
+                return item.split("\"")[1] == 'true'
+        return False
+    else:
+        return False
 
 
 def checkLogin(request):
@@ -290,3 +312,74 @@ def entercontest(username, contestid):
     targetPath = permanentTool.cleanPermanentPath(username)
     dockerTool.backupPermanentPath(targetPort, targetPath)
     return None
+
+def killHighCPUPods():
+    try:
+        r = redis.Redis(host=context.getHost(), port=6379, decode_responses=True)
+        pod_cnt = {}
+
+        while True:
+
+            pod_metrics_list = k8sTool.get_pod_metrics()['items']
+            metrics_map = {pod['metadata']['name']: pod['containers'][0]['usage'] for pod in pod_metrics_list}
+            
+            user_keys = r.keys('UserPort:*')
+
+            for user_key in user_keys:
+                username = user_key.split(':')[1]
+                port = r.get(user_key)
+
+                pod = k8sTool.getPod(port)
+                pod_name = pod.metadata.name
+                # memory = str(round(int(metrics_map[pod_name]['memory'][:-2]) / 1024.0, 2)) + 'MB' if pod_name in metrics_map else '暂无数据'
+                cpu = round(int(metrics_map[pod_name]['cpu'][:-1]) / 1000000, 2) if pod_name in metrics_map else 0
+
+                if cpu > 380:
+                    if pod_name in pod_cnt:
+                        pod_cnt[pod_name] += 1
+                    else:
+                        pod_cnt[pod_name] = 1
+                    logging.warning("username={}, podName={} use cpu={}, counter={}".format(username, pod_name, cpu, pod_cnt[pod_name]))
+                    if pod_cnt[pod_name] >= 3:
+                        redisTool.removeUser(username)
+                        del pod_cnt[pod_name]
+                        messageTool.websocket_send_message(username, {"type": "kick", "body": {"reason": "您CPU使用率过高，管理员已将您踢出，若要继续使用请重新申请"}})
+                else:
+                    if pod_name in pod_cnt:
+                        del pod_cnt[pod_name]
+            time.sleep(20)
+    except Exception as e:
+        logging.error(e)
+
+
+def refreshPodsStatus():
+    try:
+        _thread.start_new_thread(killHighCPUPods, ())
+    except:
+        print("Error: 无法启动Pods监测线程")
+    return
+
+def newUserToken():
+    try:
+        while True:
+            onlineUserList = redisTool.getOnlineUserList()
+            logging.info("online users: " + json.dumps(onlineUserList))
+            channel_layer = get_channel_layer()
+
+            for user in onlineUserList:
+                group_name = 'user_' + user
+                cnt = getattr(channel_layer, group_name, 0)
+                if cnt != 0:
+                    redisTool.queryUser(user)
+            
+            time.sleep(120)
+    except Exception as e:
+        print("Token刷新程序报错")
+        print(e)
+
+
+def refreshUserToken():
+    try:
+        _thread.start_new_thread(newUserToken, ())
+    except:
+        print("Error: 无法启动Token刷新线程")

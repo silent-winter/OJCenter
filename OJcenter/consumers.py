@@ -36,20 +36,19 @@ class BaseConsumer(AsyncJsonWebsocketConsumer):
             return
         # 防止多开, 检查group里是否有其他连接
         count = getattr(self.channel_layer, self.group_name, 0)
+        setattr(self.channel_layer, self.group_name, count + 1)
         if count > 0:
             # 已经有其他连接, 关闭本连接
-            setattr(self.channel_layer, self.group_name, count + 1)
             await self.accept()
             await self.close(code=4004)
         else:
-            setattr(self.channel_layer, self.group_name, 1)
             await self.channel_layer.group_add(self.group_name, self.channel_name)
             await self.accept()
 
     async def disconnect(self, close_code):
-        count = getattr(self.channel_layer, self.group_name, 0)
-        setattr(self.channel_layer, self.group_name, count - 1)
-        if self.username:
+        if self.group_name:
+            count = getattr(self.channel_layer, self.group_name, 0)
+            setattr(self.channel_layer, self.group_name, count - 1)
             await self.channel_layer.group_discard(self.group_name, self.channel_name)
 
     async def check_auth(self):
@@ -148,3 +147,6 @@ class BaseConsumer(AsyncJsonWebsocketConsumer):
 
     async def send_notice_message(self, event):
         await self.send_json(event['message'])
+
+    async def close_ws(self, event):
+        await self.close(code=4005)

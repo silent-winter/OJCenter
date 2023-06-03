@@ -3,7 +3,8 @@ import platform
 
 import MySQLdb
 import pandas as pd
-from asgiref.sync import sync_to_async
+from asgiref.sync import sync_to_async, async_to_sync
+from channels.layers import get_channel_layer
 from django.db import close_old_connections
 from django.db.models import Q
 from django.utils import timezone
@@ -37,6 +38,19 @@ def save_message_read_log(username, notification_id):
         username=username,
         notificationid=notification_id,
         updatetime=timezone.now().strftime('%Y-%m-%d %H:%M:%S')
+    )
+
+
+@async_to_sync
+async def websocket_send_message(username, message):
+    channel_layer = get_channel_layer()
+    group_name = 'user_' + username
+    await channel_layer.group_send(
+        group_name,
+        {
+            'type': 'send_notice_message',
+            'message': message
+        }
     )
 
 

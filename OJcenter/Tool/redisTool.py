@@ -6,10 +6,12 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 
 import redis  # 导入redis 模块
+from django.db import close_old_connections
 
 from OJcenter import context
 from OJcenter.Tool import systemTool, permanentTool, k8sTool
 from OJcenter.Tool.k8sTool import PodMetaInfo
+from OJcenter.model import UserUseLog
 
 ex_time = 15 * 60
 # ex_time = 1 * 30
@@ -144,6 +146,12 @@ def popUser():
 
             # dockerTool.copyPermanentFolder(targetUser, targetPort, targetInnerPath)
             k8sTool.copyPermanentFolder(targetUser, pvPath)
+            # 保存用户使用记录
+            close_old_connections()
+            pod = k8sTool.getPod(targetPort)
+            pod_name = pod.metadata.name
+            user_use_log = UserUseLog(username=targetUser, pod_name=pod_name)
+            user_use_log.save()
 
             # r.set(_Str_User_to_Token + targetUser, targetTokens, ex=ex_time)
             return targetUser, targetPort
@@ -338,6 +346,11 @@ def getPortList():
             tempPort = key.replace(_Str_Port_to_User, "", 1)
             occupiedPortList.append(int(tempPort))
     return occupiedPortList
+
+
+def getOnlineUserList():
+    keys = r.keys("PortUser:*")
+    return r.mget(keys)
 
 
 if __name__ == '__main__':

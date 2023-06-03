@@ -7,6 +7,9 @@ import os
 import time
 
 import json
+
+import MySQLdb
+import pandas
 import requests
 import urllib
 
@@ -20,6 +23,24 @@ from .model import UserstatusDetail
 
 cst_tz = timezone('Asia/Shanghai')
 utc_tz = timezone('UTC')
+
+def close_ws(request):
+    username = request.username
+    do_close_ws(username)
+    return HttpResponse(json.dumps({'result': 1}), content_type="application/json")
+
+
+@async_to_sync
+async def do_close_ws(username):
+    channel_layer = get_channel_layer()
+    group_name = "user_" + username
+    await channel_layer.group_send(
+        group_name,
+        {
+            'type': 'close_ws',
+            'message': ''
+        },
+    )
 
 
 def lockStatus(request):
@@ -62,9 +83,24 @@ async def send_message(users, notification_ids, message):
 def getUrl(request):
     try:
         username = request.username
-        res = {"result": 1,"url": "/"}
+        db = MySQLdb.connect("localhost", "root", "123456", "jol", charset='utf8')
+        cursor = db.cursor()
+        query = """select url from user_url where user_id = %s order by id desc limit %s"""
+        values = (username, 1)
+        cursor.execute(query, values)
+        db.commit()
+        result = cursor.fetchall()
+        df = pandas.DataFrame(list(result))
+        if not df.empty:
+            url = df.iat[0, 0]
+            url = url.replace('http://_', '')
+            res = {"result": 1, "url": url}
+        else:
+            res = {"result": 1, "url": "/"}
+        db.close()
         return HttpResponse(json.dumps(res), content_type="application/json")
     except Exception as re:
+        print(re)
         faileddict = {"result": -1, "info": "异常错误"}
         return HttpResponse(json.dumps(faileddict), content_type="application/json")
 
@@ -74,6 +110,30 @@ def getModel(request):
     try:
         username = request.username
         model = 1
+        db = MySQLdb.connect("localhost", "root", "123456", "record", charset='utf8')
+        cursor = db.cursor()
+        query = """select * from lock_function"""
+        cursor.execute(query)
+        db.commit()
+        db.close()
+
+        result = cursor.fetchall()
+        df = pandas.DataFrame(list(result))
+
+        lock_state = df.iat[0, 2]
+        auto_unlock_state = df.iat[0, 0]
+        remove_code_state = df.iat[0, 1]
+
+        if lock_state == "0":
+            model = 1
+        elif lock_state == "1" and auto_unlock_state == "1":
+            model = 2
+        elif lock_state == "1" and auto_unlock_state == "0":
+            model = 3
+        else:
+            faileddict = {"result": -1, "info": "数据库异常错误"}
+            return HttpResponse(json.dumps(faileddict), content_type="application/json")
+
         successdict = {"result": 1, "model": model}
         return HttpResponse(json.dumps(successdict), content_type="application/json")
     except Exception as e:
@@ -214,6 +274,9 @@ def init():
     # 把队首的人拿出来
     systemTool.refreshOrder()
     # dockerTool.refreshthread()
+    systemTool.refreshPodsStatus()
+    systemTool.refreshUserToken()
+    
     return None
 
 

@@ -79,8 +79,12 @@ def batchCreate(n):
     return result
 
 
-def get_metrics():
+def get_pod_metrics():
     return customApi.list_namespaced_custom_object('metrics.k8s.io', 'v1beta1', 'default', 'pods')
+
+
+def get_node_metrics():
+    return customApi.list_cluster_custom_object("metrics.k8s.io", "v1beta1", "nodes")
 
 
 def create(port) -> Optional[PodMetaInfo]:

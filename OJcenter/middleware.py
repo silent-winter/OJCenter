@@ -5,7 +5,7 @@ from OJcenter.Tool import systemTool
 
 login_list = ['/insertuser', '/getorder', '/checkstatus', '/checkalive', '/removeuser', '/getuserport',
               '/getusertoken', '/getusetime', '/editcode', '/getusername', '/onlinecount', '/checkmessage',
-              '/getmodel', '/getlasturl', '/lockstatus']
+              '/getmodel', '/getlasturl', '/lockstatus', '/close']
 
 
 class LoginMiddleware(MiddlewareMixin):

@@ -45,3 +45,24 @@ class Notificationget(models.Model):
     class Meta:
         managed = False
         db_table = 'notificationget'
+
+class PodRecord(models.Model):
+    username = models.CharField(max_length=255)
+    cpu = models.FloatField(blank=True, null=True)
+    memory = models.FloatField(blank=True, null=True)
+    update_time = models.DateTimeField(blank=True, null=True, auto_now_add=True)
+    pod_name = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'pod_record'
+
+class UserUseLog(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    username = models.CharField(max_length=255)
+    start_time = models.DateTimeField(auto_now_add=True)
+    pod_name = models.CharField(max_length=255)
+
+    class Meta:
+        managed = False
+        db_table = 'user_use_log'
